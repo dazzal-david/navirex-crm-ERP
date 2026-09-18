@@ -107,7 +107,7 @@ export class EnvironmentVariables {
 
 	@IsOptional()
 	@IsString()
-	@MinLength(16)
+	@MinLength(1)
 	WHATSAPP_WEBHOOK_VERIFY_TOKEN?: string;
 
 	@IsOptional()
