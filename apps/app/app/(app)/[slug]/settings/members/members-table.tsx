@@ -1,5 +1,7 @@
 "use client";
 
+import Add from "@carbon/icons-react/es/Add";
+import Copy from "@carbon/icons-react/es/Copy";
 import OverflowMenuHorizontal from "@carbon/icons-react/es/OverflowMenuHorizontal";
 import { Button } from "@crm/ui/components/button";
 import {
@@ -7,6 +9,15 @@ import {
 	type DataTableColumn,
 	type DataTableFacet,
 } from "@crm/ui/components/data-table";
+import {
+	Dialog,
+	DialogContent,
+	DialogDescription,
+	DialogFooter,
+	DialogHeader,
+	DialogTitle,
+	DialogTrigger,
+} from "@crm/ui/components/dialog";
 import {
 	DropdownMenu,
 	DropdownMenuContent,
@@ -169,21 +180,79 @@ export function MembersTable() {
 	];
 
 	return (
-		<DataTable
-			query={query}
-			search={<ListSearch placeholder="Search by name or email…" />}
-			columns={columns(
-				workspace.data?.canChangeRoles ?? false,
-				(member, role) => setRole.mutate({ memberId: member.id, role }),
-				setRole.isPending,
-			)}
-			rows={members.data?.rows ?? []}
-			total={members.data?.total ?? 0}
-			facetCounts={facetCounts}
-			facets={facets}
-			getRowId={(row) => row.id}
-			loading={members.isFetching}
-			empty="Nobody matches this view."
-		/>
+		<div className="flex min-h-0 flex-1 flex-col gap-4">
+			{workspace.data?.canChangeRoles ? <MemberSetup /> : null}
+			<DataTable
+				query={query}
+				search={<ListSearch placeholder="Search by name or email…" />}
+				columns={columns(
+					workspace.data?.canChangeRoles ?? false,
+					(member, role) => setRole.mutate({ memberId: member.id, role }),
+					setRole.isPending,
+				)}
+				rows={members.data?.rows ?? []}
+				total={members.data?.total ?? 0}
+				facetCounts={facetCounts}
+				facets={facets}
+				getRowId={(row) => row.id}
+				loading={members.isFetching}
+				empty="Nobody matches this view."
+			/>
+		</div>
+	);
+}
+
+function MemberSetup() {
+	async function copySignUpLink() {
+		await navigator.clipboard.writeText(`${window.location.origin}/sign-in`);
+		toast.success("Sign-up link copied.");
+	}
+
+	return (
+		<div className="flex flex-col justify-between gap-3 rounded-lg border bg-card p-4 sm:flex-row sm:items-center">
+			<div>
+				<p className="font-medium text-sm">Add Navirex employees</p>
+				<p className="text-muted-foreground text-sm">
+					Employees create their own secure account, then appear in this list.
+				</p>
+			</div>
+			<Dialog>
+				<DialogTrigger asChild>
+					<Button size="sm">
+						<Add data-icon="inline-start" />
+						Add member
+					</Button>
+				</DialogTrigger>
+				<DialogContent>
+					<DialogHeader>
+						<DialogTitle>Add an employee</DialogTitle>
+						<DialogDescription>
+							Share the secure sign-up link with an approved employee.
+						</DialogDescription>
+					</DialogHeader>
+					<ol className="list-decimal space-y-2 pl-5 text-sm">
+						<li>Add their email or company domain to ALLOWED_SIGN_IN.</li>
+						<li>Ask them to create an account with the link below.</li>
+						<li>After their first sign-in, assign their role here.</li>
+					</ol>
+					<div className="rounded-md border bg-muted/40 px-3 py-2 font-mono text-xs">
+						/sign-in
+					</div>
+					<DialogFooter>
+						<Button
+							onClick={() => {
+								copySignUpLink().catch(() =>
+									toast.error("Could not copy the sign-up link."),
+								);
+							}}
+							type="button"
+						>
+							<Copy data-icon="inline-start" />
+							Copy sign-up link
+						</Button>
+					</DialogFooter>
+				</DialogContent>
+			</Dialog>
+		</div>
 	);
 }

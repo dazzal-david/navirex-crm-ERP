@@ -1,6 +1,7 @@
 "use client";
 
 import Add from "@carbon/icons-react/es/Add";
+import { authClient } from "@crm/auth/client";
 import { Badge } from "@crm/ui/components/badge";
 import { Button } from "@crm/ui/components/button";
 import {
@@ -10,7 +11,12 @@ import {
 	CardHeader,
 	CardTitle,
 } from "@crm/ui/components/card";
-import { Field, FieldGroup, FieldLabel } from "@crm/ui/components/field";
+import {
+	Field,
+	FieldDescription,
+	FieldGroup,
+	FieldLabel,
+} from "@crm/ui/components/field";
 import { Input } from "@crm/ui/components/input";
 import {
 	Sheet,
@@ -55,29 +61,32 @@ export function EmployeePortal() {
 	const profile = me.data?.profile;
 	return (
 		<div className="grid gap-6 lg:grid-cols-[20rem_minmax(0,1fr)]">
-			<Card>
-				<CardHeader>
-					<CardTitle>{profile?.name}</CardTitle>
-					<CardDescription>
-						{profile?.designation ?? ROLE_LABEL[profile?.role ?? "member"]}
-					</CardDescription>
-				</CardHeader>
-				<CardContent className="flex flex-col gap-3 text-sm">
-					<Row label="Email" value={profile?.email} />
-					<Row label="Employee code" value={profile?.employeeCode} />
-					<Row label="Department" value={profile?.department} />
-					<Row label="Location" value={profile?.location} />
-					<Row label="Manager" value={profile?.managerName} />
-					<Row
-						label="Joined"
-						value={
-							profile?.joinedAt
-								? new Date(profile.joinedAt).toLocaleDateString()
-								: null
-						}
-					/>
-				</CardContent>
-			</Card>
+			<div className="flex flex-col gap-6">
+				<Card>
+					<CardHeader>
+						<CardTitle>{profile?.name}</CardTitle>
+						<CardDescription>
+							{profile?.designation ?? ROLE_LABEL[profile?.role ?? "member"]}
+						</CardDescription>
+					</CardHeader>
+					<CardContent className="flex flex-col gap-3 text-sm">
+						<Row label="Email" value={profile?.email} />
+						<Row label="Employee code" value={profile?.employeeCode} />
+						<Row label="Department" value={profile?.department} />
+						<Row label="Location" value={profile?.location} />
+						<Row label="Manager" value={profile?.managerName} />
+						<Row
+							label="Joined"
+							value={
+								profile?.joinedAt
+									? new Date(profile.joinedAt).toLocaleDateString()
+									: null
+							}
+						/>
+					</CardContent>
+				</Card>
+				<PasswordCard />
+			</div>
 			<div className="flex min-w-0 flex-col gap-4">
 				<div className="flex items-center justify-between gap-3">
 					<div>
@@ -198,6 +207,111 @@ export function EmployeePortal() {
 				</div>
 			</div>
 		</div>
+	);
+}
+
+const MIN_PASSWORD_LENGTH = 12;
+
+function PasswordCard() {
+	const [pending, setPending] = useState(false);
+
+	async function changePassword(form: HTMLFormElement) {
+		const data = new FormData(form);
+		const currentPassword = String(data.get("currentPassword") ?? "");
+		const newPassword = String(data.get("newPassword") ?? "");
+		const confirmation = String(data.get("confirmation") ?? "");
+
+		if (newPassword !== confirmation) {
+			toast.error("The new passwords do not match.");
+			setPending(false);
+			return;
+		}
+
+		const { error } = await authClient.changePassword({
+			currentPassword,
+			newPassword,
+			revokeOtherSessions: true,
+		});
+
+		if (error) {
+			toast.error(error.message ?? "Password could not be changed.");
+			setPending(false);
+			return;
+		}
+
+		form.reset();
+		setPending(false);
+		toast.success("Password changed. Other sessions were signed out.");
+	}
+
+	return (
+		<Card>
+			<CardHeader>
+				<CardTitle>Account security</CardTitle>
+				<CardDescription>Change your CRM password.</CardDescription>
+			</CardHeader>
+			<CardContent>
+				<form
+					className="flex flex-col gap-4"
+					onSubmit={(event) => {
+						event.preventDefault();
+						setPending(true);
+						changePassword(event.currentTarget).catch(() => {
+							setPending(false);
+							toast.error("Password could not be changed.");
+						});
+					}}
+				>
+					<FieldGroup>
+						<Field>
+							<FieldLabel htmlFor="current-password">
+								Current password
+							</FieldLabel>
+							<Input
+								autoComplete="current-password"
+								id="current-password"
+								name="currentPassword"
+								required
+								type="password"
+							/>
+						</Field>
+						<Field>
+							<FieldLabel htmlFor="new-password">New password</FieldLabel>
+							<Input
+								autoComplete="new-password"
+								id="new-password"
+								minLength={MIN_PASSWORD_LENGTH}
+								name="newPassword"
+								required
+								type="password"
+							/>
+							<FieldDescription>
+								Use at least {MIN_PASSWORD_LENGTH} characters.
+							</FieldDescription>
+						</Field>
+						<Field>
+							<FieldLabel htmlFor="confirm-password">
+								Confirm new password
+							</FieldLabel>
+							<Input
+								autoComplete="new-password"
+								id="confirm-password"
+								minLength={MIN_PASSWORD_LENGTH}
+								name="confirmation"
+								required
+								type="password"
+							/>
+						</Field>
+					</FieldGroup>
+					<Button disabled={pending} type="submit">
+						{pending ? "Changing…" : "Change password"}
+					</Button>
+					<p className="text-muted-foreground text-xs">
+						Microsoft-only accounts use their Microsoft password.
+					</p>
+				</form>
+			</CardContent>
+		</Card>
 	);
 }
 
