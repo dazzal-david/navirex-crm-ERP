@@ -1,6 +1,7 @@
 export const GOOGLE_PROVIDER_ID = "google";
 export const MICROSOFT_PROVIDER_ID = "microsoft";
 export const SLACK_PROVIDER_ID = "slack";
+export const META_PROVIDER_ID = "meta";
 
 export const MAILBOX_PROVIDER_IDS = [
 	GOOGLE_PROVIDER_ID,
@@ -12,12 +13,22 @@ export type MailboxProviderId = (typeof MAILBOX_PROVIDER_IDS)[number];
 export const IDENTITY_SCOPES = ["openid", "email", "profile"] as const;
 
 export const GMAIL_SCOPE = "https://www.googleapis.com/auth/gmail.readonly";
+export const GMAIL_SEND_SCOPE = "https://www.googleapis.com/auth/gmail.send";
 export const CALENDAR_SCOPE =
 	"https://www.googleapis.com/auth/calendar.readonly";
 export const OUTLOOK_MAIL_SCOPE = "Mail.Read";
+export const OUTLOOK_SEND_SCOPE = "Mail.Send";
 
 export const SYNC_SCOPES = [GMAIL_SCOPE, CALENDAR_SCOPE] as const;
+export const GOOGLE_REQUESTED_SCOPES = [
+	...SYNC_SCOPES,
+	GMAIL_SEND_SCOPE,
+] as const;
 export const MICROSOFT_SYNC_SCOPES = [OUTLOOK_MAIL_SCOPE] as const;
+export const MICROSOFT_REQUESTED_SCOPES = [
+	...MICROSOFT_SYNC_SCOPES,
+	OUTLOOK_SEND_SCOPE,
+] as const;
 
 export const SYNC_SCOPES_FOR = {
 	[GOOGLE_PROVIDER_ID]: SYNC_SCOPES,

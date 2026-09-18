@@ -46,6 +46,13 @@ const slackCredentials = ():
 	| { clientId: string; clientSecret: string }
 	| undefined => pair("SLACK_CLIENT_ID", "SLACK_CLIENT_SECRET");
 
+const metaCredentials = ():
+	| { clientId: string; clientSecret: string }
+	| undefined => pair("META_CLIENT_ID", "META_CLIENT_SECRET");
+
+const passwordSignIn = (): boolean =>
+	(optional("PASSWORD_SIGN_IN") ?? "true").toLowerCase() !== "false";
+
 const apiUrl =
 	optional("API_URL") ?? optional("BETTER_AUTH_URL") ?? DEFAULT_API_URL;
 
@@ -59,12 +66,26 @@ const appUrl = appUrls[0] ?? DEFAULT_APP_URL;
 export const env = {
 	apiUrl,
 	appUrl,
-	google: googleCredentials(),
-	microsoft: microsoftCredentials(),
-	slack: slackCredentials(),
+	get google() {
+		return googleCredentials();
+	},
+	get microsoft() {
+		return microsoftCredentials();
+	},
+	get slack() {
+		return slackCredentials();
+	},
+	get meta() {
+		return metaCredentials();
+	},
+	get password() {
+		return passwordSignIn();
+	},
 	cookieDomain: optional("AUTH_COOKIE_DOMAIN"),
 	trustedOrigins: [...new Set([...appUrls, apiUrl])],
-	isProduction: process.env.NODE_ENV === "production",
+	get isProduction() {
+		return process.env.NODE_ENV === "production";
+	},
 } as const;
 
 export function isGoogleConfigured(): boolean {
@@ -77,6 +98,14 @@ export function isMicrosoftConfigured(): boolean {
 
 export function isSlackConfigured(): boolean {
 	return env.slack !== undefined;
+}
+
+export function isMetaConfigured(): boolean {
+	return env.meta !== undefined;
+}
+
+export function isPasswordConfigured(): boolean {
+	return env.password;
 }
 
 export { apiUrl, appUrl };

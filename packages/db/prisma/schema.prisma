@@ -16,6 +16,7 @@ model User {
   id            String    @id
   name          String
   email         String
+  designation   String?
   emailVerified Boolean   @default(false)
   image         String?
   createdAt     DateTime  @default(now())
@@ -26,12 +27,20 @@ model User {
   ownedCompanies Company[]           @relation("CompanyOwner")
   ownedContacts  Contact[]           @relation("ContactOwner")
   ownedDeals     Deal[]              @relation("DealOwner")
+  ownedLeads     Lead[]              @relation("LeadOwner")
   activities     Activity[]          @relation("ActivityAuthor")
   mailboxSyncs   MailboxSync[]
   factDecisions  ContactFact[]       @relation("FactDecider")
   conversations  AgentConversation[] @relation("ConversationOwner")
   fieldValues    FieldValue[]        @relation("FieldValueUser")
   savedViews     SavedView[]         @relation("SavedViewOwner")
+  metaPageConnections MetaPageConnection[] @relation("MetaConnectionOwner")
+	messageTemplates MessageTemplate[] @relation("MessageTemplateCreator")
+	inboundWebhooks InboundWebhook[] @relation("InboundWebhookCreator")
+	employeeProfile EmployeeProfile? @relation("EmployeeProfileUser")
+	managedEmployees EmployeeProfile[] @relation("EmployeeProfileManager")
+	reimbursements Reimbursement[] @relation("ReimbursementEmployee")
+	reviewedReimbursements Reimbursement[] @relation("ReimbursementReviewer")
 
   createdAgentDefinitions AgentDefinition[]             @relation("AgentDefinitionCreator")
   createdAgentVersions    AgentVersion[]                @relation("AgentVersionCreator")
@@ -324,6 +333,7 @@ model Company {
   contacts       Contact[]           @relation("CompanyContacts")
   conversations  AgentConversation[]
   deals          Deal[]
+  leads          Lead[]
   activities     Activity[]
   emailThreads   EmailThread[]
   calendarEvents CalendarEvent[]
@@ -385,6 +395,7 @@ model Contact {
   archivedAt     DateTime?
 
   deals           DealContact[]
+  leads           Lead[]
   activities      Activity[]
   emailThreads    EmailThread[]
   calendarEvents  CalendarEvent[]
@@ -956,6 +967,201 @@ model Deal {
   @@map("deal")
 }
 
+
+enum LeadStage {
+  UNASSIGNED
+  ASSIGNED
+  TALKING
+  INTERESTED
+  REJECTED
+  APPROVED
+}
+
+enum NavirexEntity {
+  INDIA
+  GERMANY
+}
+
+enum LeadKind {
+  EPC
+  CUSTOMER
+  OTHER
+}
+
+model Lead {
+  id          String  @id @default(cuid())
+  name        String
+  companyName String?
+  email       String?
+  phone       String?
+
+  kind   LeadKind       @default(EPC)
+  entity NavirexEntity?
+
+  stage          LeadStage @default(UNASSIGNED)
+  stageChangedAt DateTime  @default(now())
+  position       Int       @default(0)
+
+  ownerId String?
+  owner   User?   @relation("LeadOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+
+  source        String?
+  externalId    String?
+  country       String?
+  notes         String?
+  rejectedReason String?
+
+  zohoId String?
+
+  companyId String?
+  company   Company? @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  contactId String?
+  contact   Contact? @relation(fields: [contactId], references: [id], onDelete: SetNull)
+
+  lastActivityAt DateTime?
+  archivedAt     DateTime?
+
+  activities Activity[]
+  formSubmissions FormSubmission[]
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+
+  @@unique([zohoId])
+  @@index([stage, position])
+  @@index([ownerId])
+  @@index([entity])
+  @@index([kind])
+  @@index([companyId])
+  @@index([contactId])
+  @@index([lastActivityAt])
+  @@index([archivedAt])
+  @@unique([source, externalId])
+  @@map("lead")
+}
+
+model MetaPageConnection {
+  id          String @id @default(cuid())
+  pageId      String @unique
+  pageName    String
+  accessToken String
+
+  connectedById String
+  connectedBy   User @relation("MetaConnectionOwner", fields: [connectedById], references: [id], onDelete: Cascade)
+
+  subscribedAt DateTime?
+  lastSyncedAt DateTime?
+  lastError    String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([connectedById])
+  @@map("metaPageConnection")
+}
+
+enum MessageTemplateChannel {
+	EMAIL
+	WHATSAPP
+	NOTE
+}
+
+model MessageTemplate {
+	id String @id @default(cuid())
+	name String
+	channel MessageTemplateChannel
+	subject String?
+	body String
+	providerTemplateName String?
+	language String @default("en_US")
+	active Boolean @default(true)
+
+	createdById String
+	createdBy User @relation("MessageTemplateCreator", fields: [createdById], references: [id], onDelete: Restrict)
+
+	createdAt DateTime @default(now())
+	updatedAt DateTime @updatedAt
+
+	@@unique([channel, name])
+	@@index([active, channel])
+	@@map("messageTemplate")
+}
+
+model InboundWebhook {
+	id String @id @default(cuid())
+	name String
+	source String
+	secretHash String
+	enabled Boolean @default(true)
+	lastReceivedAt DateTime?
+	lastError String?
+
+	createdById String
+	createdBy User @relation("InboundWebhookCreator", fields: [createdById], references: [id], onDelete: Restrict)
+
+	createdAt DateTime @default(now())
+	updatedAt DateTime @updatedAt
+
+	@@index([enabled])
+	@@map("inboundWebhook")
+}
+
+model EmployeeProfile {
+	userId String @id
+	user User @relation("EmployeeProfileUser", fields: [userId], references: [id], onDelete: Cascade)
+	employeeCode String? @unique
+	department String?
+	location String?
+	phone String?
+	employmentType String?
+	joinedAt DateTime?
+	bio String?
+	emergencyContactName String?
+	emergencyContactPhone String?
+
+	managerId String?
+	manager User? @relation("EmployeeProfileManager", fields: [managerId], references: [id], onDelete: SetNull)
+
+	createdAt DateTime @default(now())
+	updatedAt DateTime @updatedAt
+
+	@@index([managerId])
+	@@index([department])
+	@@map("employeeProfile")
+}
+
+enum ReimbursementStatus {
+	SUBMITTED
+	APPROVED
+	REJECTED
+	PAID
+}
+
+model Reimbursement {
+	id String @id @default(cuid())
+	title String
+	description String?
+	amount Decimal @db.Decimal(14, 2)
+	currency String @default("INR")
+	expenseDate DateTime
+	receiptUrl String?
+	status ReimbursementStatus @default(SUBMITTED)
+	reviewNote String?
+
+	employeeId String
+	employee User @relation("ReimbursementEmployee", fields: [employeeId], references: [id], onDelete: Cascade)
+	reviewedById String?
+	reviewedBy User? @relation("ReimbursementReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+	reviewedAt DateTime?
+	paidAt DateTime?
+
+	createdAt DateTime @default(now())
+	updatedAt DateTime @updatedAt
+
+	@@index([employeeId, createdAt])
+	@@index([status, createdAt])
+	@@map("reimbursement")
+}
+
 enum RateSource {
   FETCHED
   MANUAL
@@ -1122,6 +1328,8 @@ model Activity {
   contact   Contact? @relation(fields: [contactId], references: [id], onDelete: Cascade)
   dealId    String?
   deal      Deal?    @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  leadId    String?
+  lead      Lead?    @relation(fields: [leadId], references: [id], onDelete: Cascade)
 
   createdById String
   createdBy   User   @relation("ActivityAuthor", fields: [createdById], references: [id])
@@ -1137,6 +1345,7 @@ model Activity {
 
   @@index([companyId, createdAt])
   @@index([dealId, createdAt])
+  @@index([leadId, createdAt])
   @@index([contactId, createdAt])
   @@index([dueAt])
   @@index([createdById])
@@ -1426,6 +1635,8 @@ model FormSubmission {
   visitorId String?
   contactId String?
   contact   Contact? @relation("SubmissionContact", fields: [contactId], references: [id], onDelete: SetNull)
+  leadId    String?
+  lead      Lead?    @relation(fields: [leadId], references: [id], onDelete: SetNull)
 
   host  String
   path  String
@@ -1443,6 +1654,7 @@ model FormSubmission {
   createdAt DateTime @default(now())
 
   @@index([contactId])
+  @@index([leadId])
   @@index([createdAt])
   @@map("formSubmission")
 }

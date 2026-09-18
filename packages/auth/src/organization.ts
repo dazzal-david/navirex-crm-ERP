@@ -3,9 +3,9 @@ import { WORKSPACE_ID, workspaceSlug } from "@crm/db/workspace";
 
 export { WORKSPACE_ID };
 
-export const DEFAULT_WORKSPACE_NAME = "CRM";
+export const DEFAULT_WORKSPACE_NAME = "Navirex";
 
-export const WORKSPACE_ROLES = ["owner", "admin", "member"] as const;
+export const WORKSPACE_ROLES = ["owner", "admin", "manager", "member"] as const;
 
 export type WorkspaceRole = (typeof WORKSPACE_ROLES)[number];
 
@@ -35,6 +35,18 @@ export function canManageConnections(role: WorkspaceRole | null): boolean {
 
 export function canManageTracking(role: WorkspaceRole | null): boolean {
 	return isWorkspaceAdmin(role);
+}
+
+export function canManageEmployees(role: WorkspaceRole | null): boolean {
+	return isWorkspaceAdmin(role) || role === "manager";
+}
+
+export function canReviewReimbursements(role: WorkspaceRole | null): boolean {
+	return canManageEmployees(role);
+}
+
+export function canManageTemplates(role: WorkspaceRole | null): boolean {
+	return canManageEmployees(role);
 }
 
 export async function ensureWorkspaceMembership(
@@ -98,6 +110,25 @@ export async function ensureWorkspaceMembership(
 				},
 				update: {},
 			});
+
+			const founder = await tx.member.findFirst({
+				where: { organizationId: workspace.id, role: "owner" },
+				select: { id: true },
+			});
+
+			if (!founder) {
+				const earliest = await tx.member.findFirst({
+					where: { organizationId: workspace.id },
+					select: { id: true },
+					orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+				});
+				if (earliest) {
+					await tx.member.update({
+						where: { id: earliest.id },
+						data: { role: "owner" },
+					});
+				}
+			}
 
 			return workspace.id;
 		});

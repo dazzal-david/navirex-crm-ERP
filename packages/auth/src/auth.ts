@@ -13,10 +13,11 @@ import { env } from "./env";
 import { ensureWorkspaceMembership } from "./organization";
 import {
 	GOOGLE_PROVIDER_ID,
+	GOOGLE_REQUESTED_SCOPES,
+	META_PROVIDER_ID,
 	MICROSOFT_PROVIDER_ID,
-	MICROSOFT_SYNC_SCOPES,
+	MICROSOFT_REQUESTED_SCOPES,
 	SLACK_PROVIDER_ID,
-	SYNC_SCOPES,
 } from "./scopes";
 import { notifySignedIn } from "./signed-in";
 import { slackConnectGuard } from "./slack-connect";
@@ -31,8 +32,13 @@ import {
 
 const socialProviders: NonNullable<BetterAuthOptions["socialProviders"]> = {};
 const slackOAuth = env.slack;
+const metaOAuth = env.meta;
 const slackRedirectUri = new URL(
 	"/api/auth/oauth2/callback/slack",
+	env.apiUrl,
+).toString();
+const metaRedirectUri = new URL(
+	"/api/auth/oauth2/callback/meta",
 	env.apiUrl,
 ).toString();
 
@@ -40,7 +46,7 @@ if (env.google) {
 	const google: NonNullable<typeof socialProviders.google> = {
 		...env.google,
 
-		scope: [...SYNC_SCOPES],
+		scope: [...GOOGLE_REQUESTED_SCOPES],
 
 		accessType: "offline",
 	};
@@ -57,7 +63,7 @@ if (env.microsoft) {
 		clientSecret: env.microsoft.clientSecret,
 		tenantId: env.microsoft.tenantId,
 
-		scope: [...MICROSOFT_SYNC_SCOPES],
+		scope: [...MICROSOFT_REQUESTED_SCOPES],
 
 		prompt: "select_account",
 
@@ -70,7 +76,7 @@ if (env.microsoft) {
 }
 
 export const auth = betterAuth({
-	appName: "CRM",
+	appName: "Navirex CRM",
 	baseURL: env.apiUrl,
 
 	database: prismaAdapter(db, {
@@ -78,7 +84,9 @@ export const auth = betterAuth({
 	}),
 
 	emailAndPassword: {
-		enabled: false,
+		enabled: env.password,
+		minPasswordLength: 12,
+		requireEmailVerification: false,
 	},
 
 	socialProviders,
@@ -122,6 +130,56 @@ export const auth = betterAuth({
 	},
 
 	plugins: [
+		...(metaOAuth
+			? [
+					genericOAuth({
+						config: [
+							{
+								providerId: META_PROVIDER_ID,
+								authorizationUrl: "https://www.facebook.com/v26.0/dialog/oauth",
+								tokenUrl: "https://graph.facebook.com/v26.0/oauth/access_token",
+								clientId: metaOAuth.clientId,
+								clientSecret: metaOAuth.clientSecret,
+								disableSignUp: true,
+								redirectURI: metaRedirectUri,
+								scopes: [
+									"email",
+									"pages_show_list",
+									"pages_read_engagement",
+									"pages_manage_metadata",
+									"leads_retrieval",
+								],
+								getUserInfo: async (tokens) => {
+									if (!tokens.accessToken) return null;
+									const response = await fetch(
+										"https://graph.facebook.com/v26.0/me?fields=id,name,email,picture",
+										{
+											headers: {
+												authorization: `Bearer ${tokens.accessToken}`,
+											},
+										},
+									);
+									if (!response.ok) return null;
+									const profile = (await response.json()) as {
+										id?: string;
+										name?: string;
+										email?: string;
+										picture?: { data?: { url?: string } };
+									};
+									if (!profile.id || !profile.email) return null;
+									return {
+										id: profile.id,
+										name: profile.name ?? profile.email,
+										email: profile.email,
+										emailVerified: true,
+										image: profile.picture?.data?.url,
+									};
+								},
+							},
+						],
+					}),
+				]
+			: []),
 		...(slackOAuth
 			? [
 					genericOAuth({

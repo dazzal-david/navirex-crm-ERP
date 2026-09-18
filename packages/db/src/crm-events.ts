@@ -1,4 +1,4 @@
-export type CrmEventRecordKind = "company" | "contact" | "deal";
+export type CrmEventRecordKind = "company" | "contact" | "deal" | "lead";
 
 type CrmEventDefinition = {
 	label: string;
@@ -36,6 +36,11 @@ export const CRM_EVENT_CATALOG = {
 		label: "Deal closed",
 		description: "An open deal moves to a closed stage",
 		recordKind: "deal",
+	},
+	"lead.created": {
+		label: "Lead created",
+		description: "A lead arrives from any source",
+		recordKind: "lead",
 	},
 } as const satisfies Record<string, CrmEventDefinition>;
 
