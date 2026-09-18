@@ -10,7 +10,9 @@ import { brief, drainAll, taskAuth } from "../lib/dispatch";
 import { reconcileStaleTasks } from "../lib/stale-tasks";
 
 export default defineSchedule({
-	cron: "* * * * *",
+	// Vercel Hobby permits at most one invocation per day. Event-driven pokes
+	// still dispatch new work immediately; this daily pass repairs missed work.
+	cron: "0 2 * * *",
 	async run({ receive, waitUntil, appAuth }) {
 		waitUntil(
 			Promise.all([
