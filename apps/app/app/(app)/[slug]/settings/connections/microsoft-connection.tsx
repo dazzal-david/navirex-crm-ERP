@@ -2,7 +2,7 @@
 
 import Warning from "@carbon/icons-react/es/Warning";
 import { authClient } from "@crm/auth/client";
-import { MICROSOFT_SYNC_SCOPES } from "@crm/auth/scopes";
+import { MICROSOFT_REQUESTED_SCOPES } from "@crm/auth/scopes";
 import { Alert, AlertDescription, AlertTitle } from "@crm/ui/components/alert";
 import {
 	AlertDialog,
@@ -60,8 +60,8 @@ function MicrosoftUnavailable() {
 					</div>
 				</CardTitle>
 				<CardDescription>
-					Set MICROSOFT_CLIENT_ID and MICROSOFT_CLIENT_SECRET in the root .env
-					file and restart.
+					Set MICROSOFT_TENANT_ID, MICROSOFT_CLIENT_ID, and
+					MICROSOFT_CLIENT_SECRET on the API deployment, then redeploy it.
 				</CardDescription>
 			</CardHeader>
 		</Card>
@@ -89,7 +89,7 @@ function ConnectMicrosoft({
 
 		const { error } = await authClient.linkSocial({
 			provider: "microsoft",
-			scopes: [...MICROSOFT_SYNC_SCOPES],
+			scopes: [...MICROSOFT_REQUESTED_SCOPES],
 			callbackURL: `${origin}/${slug}/settings/connections/microsoft`,
 			errorCallbackURL: `${origin}/${slug}/settings/connections/microsoft?provider=microsoft`,
 		});
@@ -107,8 +107,8 @@ function ConnectMicrosoft({
 					</div>
 				</CardTitle>
 				<CardDescription>
-					Read-only Outlook mail. Only conversations with companies in the CRM
-					are stored.
+					Sync Outlook conversations and send email from the communications
+					inbox.
 				</CardDescription>
 
 				<CardAction>

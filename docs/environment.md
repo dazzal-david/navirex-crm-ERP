@@ -43,6 +43,12 @@ the three that is genuinely optional on its own — set it to your tenant's GUID
 refuse other tenants at Microsoft instead of at `ALLOWED_SIGN_IN`. There is **no
 Microsoft equivalent of `hd`**: `tenantId` is the whole of it.
 
+Production stores these three values on the `navirex-crm-api` Vercel project. The
+Entra app uses the API callback
+`https://navirex-crm-api.vercel.app/api/auth/callback/microsoft` and delegated
+`Mail.Read` and `Mail.Send` permissions. Each employee connects their own mailbox
+from Settings → Connections → Microsoft 365.
+
 **Neither pair is required, but an install wants one of them or an SSO provider** —
 with none, the sign-in page says so by name rather than rendering nothing.
 
