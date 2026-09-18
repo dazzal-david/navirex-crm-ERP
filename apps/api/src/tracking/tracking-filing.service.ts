@@ -13,6 +13,7 @@ import { isMachineDomain } from "../companies/domain";
 import { ActivityStampService } from "../crm/activity-stamp.service";
 import { normalizeEmail } from "../crm/values";
 import { InjectDatabase } from "../database/database.constants";
+import { LeadsService } from "../leads/leads.service";
 import {
 	isAutomatedAddress,
 	isMachineAddress,
@@ -54,6 +55,7 @@ export class TrackingFilingService {
 		private readonly companies: CompanyDirectoryService,
 		private readonly agent: AgentTriggerService,
 		private readonly stamp: ActivityStampService,
+		private readonly leads?: LeadsService,
 	) {}
 
 	async file(submission: {
@@ -62,6 +64,8 @@ export class TrackingFilingService {
 		host: string;
 		visitorId: string | null;
 		name: string | null;
+		phone?: string | null;
+		companyName?: string | null;
 		firstTouch?: Touch;
 		lastTouch?: Touch;
 	}): Promise<FilingOutcome> {
@@ -93,6 +97,7 @@ export class TrackingFilingService {
 
 		if (existing) {
 			await this.attach(submission.id, existing.id, submission);
+			await this.fileLead(submission, existing.id);
 			return { filed: true, contactId: existing.id };
 		}
 
@@ -125,11 +130,13 @@ export class TrackingFilingService {
 			if (!raced) throw error;
 
 			await this.attach(submission.id, raced.id, submission);
+			await this.fileLead(submission, raced.id);
 
 			return { filed: true, contactId: raced.id };
 		}
 
 		await this.attach(submission.id, contact.id, submission);
+		await this.fileLead(submission, contact.id);
 
 		await this.agent.contactCreated(
 			contact.id,
@@ -160,6 +167,50 @@ export class TrackingFilingService {
 			where: { email, archivedAt: null },
 			select: { id: true },
 		});
+	}
+
+	private async fileLead(
+		submission: {
+			id: string;
+			email: string | null;
+			host: string;
+			name: string | null;
+			phone?: string | null;
+			companyName?: string | null;
+			lastTouch?: Touch;
+		},
+		contactId: string,
+	): Promise<void> {
+		if (!this.leads) return;
+		const source = submission.lastTouch?.source
+			? `Website · ${submission.lastTouch.source}`
+			: `Website · ${submission.host}`;
+		const filed = await this.leads.intake({
+			name:
+				submission.name ??
+				submission.email ??
+				submission.phone ??
+				"Website lead",
+			companyName: submission.companyName ?? undefined,
+			email: submission.email ?? undefined,
+			phone: submission.phone ?? undefined,
+			kind: "OTHER",
+			stage: "UNASSIGNED",
+			source,
+			externalId: submission.id,
+			notes: `Submitted a form on ${submission.host}.`,
+		});
+
+		await this.db.$transaction([
+			this.db.formSubmission.update({
+				where: { id: submission.id },
+				data: { leadId: filed.id },
+			}),
+			this.db.lead.update({
+				where: { id: filed.id },
+				data: { contactId },
+			}),
+		]);
 	}
 
 	private async attach(

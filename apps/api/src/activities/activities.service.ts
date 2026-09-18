@@ -103,7 +103,7 @@ export class ActivitiesService {
 	}
 
 	async timelineCounts(
-		input: Pick<TimelineInput, "companyId" | "contactId" | "dealId">,
+		input: Pick<TimelineInput, "companyId" | "contactId" | "dealId" | "leadId">,
 	): Promise<TimelineCounts> {
 		const anchor = this.anchor(input);
 
@@ -145,13 +145,19 @@ export class ActivitiesService {
 				companyId,
 				contactId: input.contactId ?? null,
 				dealId: input.dealId ?? null,
+				leadId: input.leadId ?? null,
 				createdById: actingUserId,
 			},
 			select: ENTRY_SELECT,
 		});
 
 		await this.stamp.touch(
-			{ companyId, contactId: input.contactId, dealId: input.dealId },
+			{
+				companyId,
+				contactId: input.contactId,
+				dealId: input.dealId,
+				leadId: input.leadId,
+			},
 			activity.createdAt,
 		);
 
@@ -215,13 +221,14 @@ export class ActivitiesService {
 	}
 
 	private anchor(
-		input: Pick<TimelineInput, "companyId" | "contactId" | "dealId">,
+		input: Pick<TimelineInput, "companyId" | "contactId" | "dealId" | "leadId">,
 	): Prisma.ActivityWhereInput {
+		if (input.leadId) return { leadId: input.leadId };
 		if (input.dealId) return { dealId: input.dealId };
 		if (input.contactId) return { contactId: input.contactId };
 		if (input.companyId) return { companyId: input.companyId };
 		throw new BadRequestException(
-			"A timeline needs a company, a contact or a deal.",
+			"A timeline needs a company, a contact, a deal or a lead.",
 		);
 	}
 

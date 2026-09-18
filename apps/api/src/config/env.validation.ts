@@ -70,11 +70,36 @@ export class EnvironmentVariables {
 
 	@IsOptional()
 	@IsString()
+	PASSWORD_SIGN_IN?: string;
+
+	@IsOptional()
+	@IsString()
 	SLACK_CLIENT_ID?: string;
 
 	@IsOptional()
 	@IsString()
 	SLACK_CLIENT_SECRET?: string;
+
+	@IsOptional()
+	@IsString()
+	META_CLIENT_ID?: string;
+
+	@IsOptional()
+	@IsString()
+	META_CLIENT_SECRET?: string;
+
+	@IsOptional()
+	@IsString()
+	@MinLength(16)
+	META_WEBHOOK_VERIFY_TOKEN?: string;
+
+	@IsOptional()
+	@IsString()
+	WHATSAPP_ACCESS_TOKEN?: string;
+
+	@IsOptional()
+	@IsString()
+	WHATSAPP_PHONE_NUMBER_ID?: string;
 
 	@IsOptional()
 	@IsUrl({ require_tld: false })

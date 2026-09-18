@@ -6,6 +6,7 @@ export type ActivityTarget = {
 	companyId?: string | null;
 	contactId?: string | null;
 	dealId?: string | null;
+	leadId?: string | null;
 };
 
 export type StampTargets = {
@@ -45,6 +46,12 @@ export class ActivityStampService {
 			target.dealId
 				? this.db.deal.updateMany({
 						where: { id: target.dealId, ...stale },
+						data: { lastActivityAt: at },
+					})
+				: null,
+			target.leadId
+				? this.db.lead.updateMany({
+						where: { id: target.leadId, ...stale },
 						data: { lastActivityAt: at },
 					})
 				: null,

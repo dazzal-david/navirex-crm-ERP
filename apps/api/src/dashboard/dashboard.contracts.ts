@@ -1,4 +1,4 @@
-import { ActivityType, DealStage } from "@crm/db";
+import { ActivityType, DealStage, LeadStage, NavirexEntity } from "@crm/db";
 import { activityMeta } from "@crm/validation/activity-meta";
 import { z } from "zod";
 
@@ -7,6 +7,8 @@ const DASHBOARD_SCOPES = ["me", "everyone"] as const;
 export const dashboardSummaryInput = z.object({
 	scope: z.enum(DASHBOARD_SCOPES).default("me"),
 });
+
+export const leadDashboardInput = dashboardSummaryInput;
 
 export type DashboardSummaryInput = z.infer<typeof dashboardSummaryInput>;
 
@@ -110,4 +112,84 @@ export const dashboardSummaryOutput = z.object({
 	biggestOpen: z.array(biggestOpenDealOutput),
 	overdueTasks: z.array(overdueTaskOutput),
 	recentActivity: z.array(recentActivityOutput),
+});
+
+const leadStageOutput = z.nativeEnum(LeadStage);
+
+const leadOwnerOutput = z.object({
+	id: z.string(),
+	name: z.string(),
+	image: z.string().nullable(),
+});
+
+const dashboardLeadOutput = z.object({
+	id: z.string(),
+	name: z.string(),
+	companyName: z.string().nullable(),
+	stage: leadStageOutput,
+	source: z.string().nullable(),
+	lastActivityAt: z.string().nullable(),
+	stageChangedAt: z.string(),
+	owner: leadOwnerOutput.nullable(),
+});
+
+export const leadDashboardOutput = z.object({
+	scope: z.enum(DASHBOARD_SCOPES),
+	totals: z.object({
+		all: z.number(),
+		active: z.number(),
+		unassigned: z.number(),
+		needsAttention: z.number(),
+		newThisWeek: z.number(),
+		newPreviousWeek: z.number(),
+	}),
+	stages: z.array(
+		z.object({
+			stage: leadStageOutput,
+			count: z.number(),
+		}),
+	),
+	trend: z.array(
+		z.object({
+			day: z.string(),
+			label: z.string(),
+			created: z.number(),
+		}),
+	),
+	sources: z.array(
+		z.object({
+			source: z.string(),
+			count: z.number(),
+		}),
+	),
+	entities: z.array(
+		z.object({
+			entity: z.nativeEnum(NavirexEntity).nullable(),
+			count: z.number(),
+		}),
+	),
+	priorityLeads: z.array(dashboardLeadOutput),
+	overdueTasks: z.array(
+		z.object({
+			id: z.string(),
+			subject: z.string().nullable(),
+			dueAt: z.string(),
+			lead: z.object({ id: z.string(), name: z.string() }),
+		}),
+	),
+	recentUpdates: z.array(
+		z.object({
+			id: z.string(),
+			type: z.nativeEnum(ActivityType),
+			subject: z.string().nullable(),
+			body: z.string().nullable(),
+			createdAt: z.string(),
+			createdBy: leadOwnerOutput,
+			lead: z.object({
+				id: z.string(),
+				name: z.string(),
+				stage: leadStageOutput,
+			}),
+		}),
+	),
 });

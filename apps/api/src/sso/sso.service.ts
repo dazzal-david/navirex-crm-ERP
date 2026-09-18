@@ -3,6 +3,7 @@ import {
 	canConfigureSso,
 	isGoogleConfigured,
 	isMicrosoftConfigured,
+	isPasswordConfigured,
 	ssoCallbackBase,
 	ssoCallbackURL,
 	ssoProviderName,
@@ -126,6 +127,7 @@ export class SsoService {
 		return {
 			google: isGoogleConfigured(),
 			microsoft: isMicrosoftConfigured(),
+			password: isPasswordConfigured(),
 			providers: rows.map((row) => ({
 				providerId: row.providerId,
 				name: ssoProviderName(row.providerId),

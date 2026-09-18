@@ -9,6 +9,7 @@ import { ArchiveModule } from "./archive/archive.module";
 import { AuthModule } from "./auth/auth.module";
 import { BackfillModule } from "./backfill/backfill.module";
 import { AppCacheModule } from "./cache/cache.module";
+import { CommunicationsModule } from "./communications/communications.module";
 import { CompaniesModule } from "./companies/companies.module";
 import { validateEnv } from "./config/env.validation";
 import { ContactsModule } from "./contacts/contacts.module";
@@ -22,10 +23,13 @@ import { EnrichmentModule } from "./enrichment/enrichment.module";
 import { FieldsModule } from "./fields/fields.module";
 import { GoogleModule } from "./google/google.module";
 import { HealthModule } from "./health/health.module";
+import { LeadsModule } from "./leads/leads.module";
 import { LoggingModule } from "./logging/logging.module";
 import { logAuthRoute } from "./logging/request-logger.middleware";
 import { MailboxModule } from "./mailbox/mailbox.module";
+import { MetaModule } from "./meta/meta.module";
 import { MicrosoftModule } from "./microsoft/microsoft.module";
+import { PeopleModule } from "./people/people.module";
 import { SavedViewsModule } from "./saved-views/saved-views.module";
 import { SearchModule } from "./search/search.module";
 import { SettingsModule } from "./settings/settings.module";
@@ -33,9 +37,11 @@ import { SlackModule } from "./slack/slack.module";
 import { SsoModule } from "./sso/sso.module";
 import { SyncModule } from "./sync/sync.module";
 import { TelemetryModule } from "./telemetry/telemetry.module";
+import { TemplatesModule } from "./templates/templates.module";
 import { TrackingModule } from "./tracking/tracking.module";
 import { TrpcModule } from "./trpc/trpc.module";
 import { UsersModule } from "./users/users.module";
+import { WebhooksModule } from "./webhooks/webhooks.module";
 import { WorkspaceModule } from "./workspace/workspace.module";
 
 @Module({
@@ -56,10 +62,12 @@ import { WorkspaceModule } from "./workspace/workspace.module";
 		UsersModule,
 		ApiKeysModule,
 		CompaniesModule,
+		CommunicationsModule,
 		ContactsModule,
 		ConversationsModule,
 		CurrencyModule,
 		DealsModule,
+		LeadsModule,
 		FieldsModule,
 		ActivitiesModule,
 		AgentModule,
@@ -67,15 +75,19 @@ import { WorkspaceModule } from "./workspace/workspace.module";
 		DashboardModule,
 		SearchModule,
 		MailboxModule,
+		MetaModule,
 		GoogleModule,
 		MicrosoftModule,
+		PeopleModule,
 		SyncModule,
 		SettingsModule,
 		WorkspaceModule,
+		WebhooksModule,
 		SsoModule,
 		SlackModule,
 		BackfillModule,
 		TelemetryModule,
+		TemplatesModule,
 		TrackingModule,
 		ArchiveModule,
 		SavedViewsModule,

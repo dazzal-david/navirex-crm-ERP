@@ -233,6 +233,11 @@ export class TrackingIngestService {
 			host,
 			visitorId,
 			name: nameFrom(fields),
+			phone: phoneFrom(fields),
+			companyName: pick(
+				fields,
+				/^(company|company[\s_-]?name|organisation|organization)$/i,
+			),
 			firstTouch,
 			lastTouch,
 		});
@@ -353,6 +358,13 @@ function nameFrom(fields: FormFields): string | null {
 	if (first) return last ? `${first} ${last}` : first;
 
 	return pick(fields, /^(full[\s_-]?name|name)$/i) ?? pick(fields, /name/i);
+}
+
+function phoneFrom(fields: FormFields): string | null {
+	return pick(
+		fields,
+		/^(phone|mobile|telephone|whatsapp|contact[\s_-]?number)$/i,
+	);
 }
 
 function pick(fields: FormFields, pattern: RegExp): string | null {

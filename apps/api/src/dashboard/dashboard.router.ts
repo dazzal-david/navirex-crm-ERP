@@ -7,6 +7,8 @@ import { restMeta } from "../trpc/openapi";
 import {
 	dashboardSummaryInput,
 	dashboardSummaryOutput,
+	leadDashboardInput,
+	leadDashboardOutput,
 } from "./dashboard.contracts";
 import { DashboardService } from "./dashboard.service";
 
@@ -27,5 +29,17 @@ export class DashboardRouter {
 		@Input() input: z.infer<typeof dashboardSummaryInput>,
 	) {
 		return this.dashboard.summary(ctx.user.id, input);
+	}
+
+	@Query({
+		input: leadDashboardInput,
+		output: leadDashboardOutput,
+		meta: restMeta("GET", "/dashboard/leads", ["Dashboard"]),
+	})
+	async leadOverview(
+		@Ctx() ctx: AuthedTrpcContext,
+		@Input() input: z.infer<typeof leadDashboardInput>,
+	) {
+		return this.dashboard.leadOverview(ctx.user.id, input);
 	}
 }

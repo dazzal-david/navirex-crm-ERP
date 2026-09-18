@@ -1,5 +1,7 @@
 import {
 	canChangeRole,
+	canManageEmployees,
+	canManageTemplates,
 	canRenameWorkspace,
 	ensureWorkspaceMembership,
 	isWorkspaceRole,
@@ -90,6 +92,8 @@ export class WorkspaceService {
 			viewerRole: role,
 			canRename: canRenameWorkspace(role),
 			canChangeRoles: canChangeRole(role),
+			canManageEmployees: canManageEmployees(role),
+			canManageTemplates: canManageTemplates(role),
 		};
 	}
 

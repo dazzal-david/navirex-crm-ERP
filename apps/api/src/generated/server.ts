@@ -16,21 +16,27 @@ const publicProcedure = t.procedure;
 import { timelineInput, timelineOutput, timelineCountsInput, timelineCountsOutput, myTasksInput, myTasksOutput, activityCreateInput, activityCreateOutput, completeInput, completeOutput } from "../activities/activities.contracts";
 import { agentListOutput, agentReviseInput, agentReviseOutput, agentIdInput, agentFilesOutput, agentSaveFileInput, agentSaveFileOutput, agentByIdOutput, agentHistoryInput, agentHistoryOutput, agentActivityOutput, agentUpdateInput, agentUpdateOutput, agentDeployInput, agentDeployOutput, agentPauseOutput, agentResumeOutput, agentArchiveOutput, agentRestoreOutput, agentRemoveOutput, agentRunNowInput, agentRunNowOutput, agentRetryRunInput, agentRetryRunOutput, agentCancelRunInput, agentCancelRunOutput } from "../agent/agents.contracts";
 import { apiKeyListInput, apiKeyListOutput, createApiKeyInput, createApiKeyOutput, revokeApiKeyInput, revokeApiKeyOutput } from "../api-keys/api-keys.contracts";
+import { communicationStatusOutput, conversationsOutput, conversationInput, conversationOutput, addNoteInput, addNoteOutput, sendEmailInput, sendMessageOutput, sendWhatsAppInput } from "../communications/communications.contracts";
 import { companyListInput, companyListOutput, companyIdInput, companyDetailOutput, companyOptionsInput, companyOptionOutput, companyCreateInput, companySummaryOutput, companyUpdateArgs, companyArchiveResultOutput, companyBulkOwnerInput, companyBulkResultOutput, companyBulkInput, companyEnrichOutput, companyResearchOutput, setPrimaryContactInput, companySetPrimaryContactOutput } from "../companies/companies.contracts";
 import { contactListInput, contactListOutput, contactIdInput, contactByIdOutput, contactCreateInput, contactBasicOutput, contactUpdateArgs, contactNameOutput, contactEnrichOutput, contactBulkOwnerInput, bulkResultOutput, contactBulkCompanyInput, contactBulkInput, factDecisionInput, decideFactOutput } from "../contacts/contacts.contracts";
 import { conversationListInput, conversationListOutput, builderListOutput, builderResourceSearchInput, builderResourcesOutput, conversationIdInput, builderConversationDetailOutput, conversationEventsInput, conversationEventsOutput, conversationSaveInput, conversationIdOutput, builderConversationCreateInput, builderConversationSubmitInput, builderQuestionResponseInput, builderResponseRatingInput, builderResponseRatingOutput, conversationShareStatusOutput, conversationShareTokenOutput, sharedConversationInput, sharedConversationOutput } from "../conversations/conversations.contracts";
 import { currencySettingsOutput, setReportingCurrencyInput, setManualRateInput, removeManualRateInput } from "../currency/currency.contracts";
-import { dashboardSummaryInput, dashboardSummaryOutput } from "../dashboard/dashboard.contracts";
+import { dashboardSummaryInput, dashboardSummaryOutput, leadDashboardInput, leadDashboardOutput } from "../dashboard/dashboard.contracts";
 import { dealListInput, dealListOutput, dealIdInput, dealDetailOutput, dealCreateInput, dealCreateOutput, dealUpdateArgs, dealMutateOutput, setStageInput, dealSetStageOutput, dealContactsInput, dealContactOptionsOutput, dealAttachContactInput, dealContactLinkOutput, dealDetachContactInput, dealContactRoleInput, dealContactRoleOutput, dealBulkOwnerInput, dealBulkResultOutput, dealBulkStageInput, dealBulkInput } from "../deals/deals.contracts";
 import { enrichmentQueueInput } from "@crm/validation/enrichment-queue";
 import { fieldListInput, fieldListOutput, fieldByKeyInput, serializedFieldOutput, fieldEntityInput, fieldFiltersOutput, fieldIdInput, fieldCoverageOutput, fieldCreateInput, fieldUpdateArgs, fieldReorderInput, fieldReorderOutput, fieldDeleteOutput, fieldBackfillOutput } from "../fields/fields.contracts";
 import { googleConnectionStatusOutput, setAutoCreateInput, suppressDomainInput, suppressDomainOutput, threadInput, emailThreadOutput, calendarEventInput, calendarEventOutput } from "../google/google.contracts";
 import { purgeSyncedDataOutput, revokeAccessOutput, microsoftConnectionStatusOutput, setOutlookAutoCreateInput } from "../microsoft/microsoft.contracts";
+import { boardInput, boardOutput, columnPageInput, columnPageOutput, leadIdInput, leadDetailOutput, leadOwnersOutput, leadCreateInput, leadMutateOutput, leadIntakeInput, leadIntakeOutput, zohoImportInput, zohoImportOutput, leadUpdateInput, leadMoveInput, leadAssignInput, leadDeleteOutput } from "../leads/leads.contracts";
+import { metaStatusOutput, metaAvailablePagesOutput, metaPageInput, metaMutationOutput, metaSyncOutput } from "../meta/meta.contracts";
+import { employeePortalOutput, directoryOutput, updateMyProfileInput, employeeProfileOutput, updateEmployeeInput, reimbursementsOutput, submitReimbursementInput, reimbursementOutput, reviewReimbursementInput, reimbursementIdInput } from "../people/people.contracts";
 import { savedViewListInput, savedViewListOutput, savedViewCreateInput, savedViewOutput, savedViewUpdateArgs, savedViewIdInput, savedViewDeleteOutput } from "../saved-views/saved-views.contracts";
 import { agentModelOutput, modelCatalogOutput, setAgentModelInput, researchKeyOutput, setResearchKeyInput, archiveRetentionOutput, setArchiveRetentionDaysInput } from "../settings/settings.contracts";
 import { slackStatusOutput, slackMatchesOutput, slackChannelsInput, slackChannelsOutput, slackJoinChannelInput, slackJoinChannelOutput, slackRefreshPeopleOutput, slackCreateChannelInput, slackCreateChannelOutput, slackDisconnectOutput } from "../slack/slack.contracts";
 import { ssoSignInOptionsOutput, ssoSettingsOutput, ssoProviderListInput, ssoProviderListOutput, registerSsoProviderInput, ssoProviderOutput, deleteSsoProviderInput, deleteSsoProviderOutput } from "../sso/sso.contracts";
+import { templatesOutput, templateCreateInput, templateOutput, templateUpdateInput } from "../templates/templates.contracts";
 import { trackingSettingsOutput, trackingFlagInput, cookieLifetimeInput, addDomainInput, trackedDomainOutput, removeDomainInput, rotateSiteIdOutput, verifyInput, verifyOutput, sourcesOutput, companyActivityInput, websiteActivityOutput, contactActivityInput } from "../tracking/tracking.contracts";
+import { webhooksOutput, webhookCreateInput, webhookCreateOutput, webhookUpdateInput, webhookOutput } from "../webhooks/webhooks.contracts";
 import { workspaceOutput, memberListInput, memberListOutput, updateWorkspaceInput, setMemberRoleInput, workspaceMemberOutput } from "../workspace/workspace.contracts";
 import type { UsersRouter } from "../users/users.router";
 
@@ -138,6 +144,30 @@ const appRouter = t.router({
     revoke: publicProcedure
       .input(revokeApiKeyInput)
       .output(revokeApiKeyOutput)
+      .mutation(async () => "PLACEHOLDER_DO_NOT_REMOVE" as any)
+    }),
+  communications: t.router({
+    status: publicProcedure
+      .output(communicationStatusOutput)
+      .query(async () => "PLACEHOLDER_DO_NOT_REMOVE" as any),
+    conversations: publicProcedure
+      .output(conversationsOutput)
+      .query(async () => "PLACEHOLDER_DO_NOT_REMOVE" as any),
+    conversation: publicProcedure
+      .input(conversationInput)
+      .output(conversationOutput)
+      .query(async () => "PLACEHOLDER_DO_NOT_REMOVE" as any),
+    addNote: publicProcedure
+      .input(addNoteInput)
+      .output(addNoteOutput)
+      .mutation(async () => "PLACEHOLDER_DO_NOT_REMOVE" as any),
+    sendEmail: publicProcedure
+      .input(sendEmailInput)
+      .output(sendMessageOutput)
+      .mutation(async () => "PLACEHOLDER_DO_NOT_REMOVE" as any),
+    sendWhatsApp: publicProcedure
+      .input(sendWhatsAppInput)
+      .output(sendMessageOutput)
       .mutation(async () => "PLACEHOLDER_DO_NOT_REMOVE" as any)
     }),
   companies: t.router({
@@ -357,6 +387,10 @@ const appRouter = t.router({
     summary: publicProcedure
       .input(dashboardSummaryInput)
       .output(dashboardSummaryOutput)
+      .query(async () => "PLACEHOLDER_DO_NOT_REMOVE" as any),
+    leadOverview: publicProcedure
+      .input(leadDashboardInput)
+      .output(leadDashboardOutput)
       .query(async () => "PLACEHOLDER_DO_NOT_REMOVE" as any)
     }),
   deals: t.router({
@@ -558,6 +592,70 @@ const appRouter = t.router({
       .output(calendarEventOutput)
       .query(async () => "PLACEHOLDER_DO_NOT_REMOVE" as any)
     }),
+  leads: t.router({
+    board: publicProcedure
+      .input(boardInput)
+      .output(boardOutput)
+      .query(async () => "PLACEHOLDER_DO_NOT_REMOVE" as any),
+    column: publicProcedure
+      .input(columnPageInput)
+      .output(columnPageOutput)
+      .query(async () => "PLACEHOLDER_DO_NOT_REMOVE" as any),
+    byId: publicProcedure
+      .input(leadIdInput)
+      .output(leadDetailOutput)
+      .query(async () => "PLACEHOLDER_DO_NOT_REMOVE" as any),
+    owners: publicProcedure
+      .output(leadOwnersOutput)
+      .query(async () => "PLACEHOLDER_DO_NOT_REMOVE" as any),
+    create: publicProcedure
+      .input(leadCreateInput)
+      .output(leadMutateOutput)
+      .mutation(async () => "PLACEHOLDER_DO_NOT_REMOVE" as any),
+    intake: publicProcedure
+      .input(leadIntakeInput)
+      .output(leadIntakeOutput)
+      .mutation(async () => "PLACEHOLDER_DO_NOT_REMOVE" as any),
+    importZoho: publicProcedure
+      .input(zohoImportInput)
+      .output(zohoImportOutput)
+      .mutation(async () => "PLACEHOLDER_DO_NOT_REMOVE" as any),
+    update: publicProcedure
+      .input(leadUpdateInput)
+      .output(leadMutateOutput)
+      .mutation(async () => "PLACEHOLDER_DO_NOT_REMOVE" as any),
+    move: publicProcedure
+      .input(leadMoveInput)
+      .output(leadMutateOutput)
+      .mutation(async () => "PLACEHOLDER_DO_NOT_REMOVE" as any),
+    assign: publicProcedure
+      .input(leadAssignInput)
+      .output(leadMutateOutput)
+      .mutation(async () => "PLACEHOLDER_DO_NOT_REMOVE" as any),
+    remove: publicProcedure
+      .input(leadIdInput)
+      .output(leadDeleteOutput)
+      .mutation(async () => "PLACEHOLDER_DO_NOT_REMOVE" as any)
+    }),
+  meta: t.router({
+    status: publicProcedure
+      .output(metaStatusOutput)
+      .query(async () => "PLACEHOLDER_DO_NOT_REMOVE" as any),
+    pages: publicProcedure
+      .output(metaAvailablePagesOutput)
+      .query(async () => "PLACEHOLDER_DO_NOT_REMOVE" as any),
+    connect: publicProcedure
+      .input(metaPageInput)
+      .output(metaMutationOutput)
+      .mutation(async () => "PLACEHOLDER_DO_NOT_REMOVE" as any),
+    disconnect: publicProcedure
+      .input(metaPageInput)
+      .output(metaMutationOutput)
+      .mutation(async () => "PLACEHOLDER_DO_NOT_REMOVE" as any),
+    sync: publicProcedure
+      .output(metaSyncOutput)
+      .mutation(async () => "PLACEHOLDER_DO_NOT_REMOVE" as any)
+    }),
   microsoft: t.router({
     status: publicProcedure
       .output(microsoftConnectionStatusOutput)
@@ -574,6 +672,40 @@ const appRouter = t.router({
     setAutoCreate: publicProcedure
       .input(setOutlookAutoCreateInput)
       .output(microsoftConnectionStatusOutput)
+      .mutation(async () => "PLACEHOLDER_DO_NOT_REMOVE" as any)
+    }),
+  people: t.router({
+    me: publicProcedure
+      .output(employeePortalOutput)
+      .query(async () => "PLACEHOLDER_DO_NOT_REMOVE" as any),
+    directory: publicProcedure
+      .output(directoryOutput)
+      .query(async () => "PLACEHOLDER_DO_NOT_REMOVE" as any),
+    updateMyProfile: publicProcedure
+      .input(updateMyProfileInput)
+      .output(employeeProfileOutput)
+      .mutation(async () => "PLACEHOLDER_DO_NOT_REMOVE" as any),
+    updateEmployee: publicProcedure
+      .input(updateEmployeeInput)
+      .output(employeeProfileOutput)
+      .mutation(async () => "PLACEHOLDER_DO_NOT_REMOVE" as any),
+    myReimbursements: publicProcedure
+      .output(reimbursementsOutput)
+      .query(async () => "PLACEHOLDER_DO_NOT_REMOVE" as any),
+    reimbursements: publicProcedure
+      .output(reimbursementsOutput)
+      .query(async () => "PLACEHOLDER_DO_NOT_REMOVE" as any),
+    submitReimbursement: publicProcedure
+      .input(submitReimbursementInput)
+      .output(reimbursementOutput)
+      .mutation(async () => "PLACEHOLDER_DO_NOT_REMOVE" as any),
+    reviewReimbursement: publicProcedure
+      .input(reviewReimbursementInput)
+      .output(reimbursementOutput)
+      .mutation(async () => "PLACEHOLDER_DO_NOT_REMOVE" as any),
+    markReimbursementPaid: publicProcedure
+      .input(reimbursementIdInput)
+      .output(reimbursementOutput)
       .mutation(async () => "PLACEHOLDER_DO_NOT_REMOVE" as any)
     }),
   savedViews: t.router({
@@ -681,6 +813,19 @@ const appRouter = t.router({
       .output(deleteSsoProviderOutput)
       .mutation(async () => "PLACEHOLDER_DO_NOT_REMOVE" as any)
     }),
+  templates: t.router({
+    list: publicProcedure
+      .output(templatesOutput)
+      .query(async () => "PLACEHOLDER_DO_NOT_REMOVE" as any),
+    create: publicProcedure
+      .input(templateCreateInput)
+      .output(templateOutput)
+      .mutation(async () => "PLACEHOLDER_DO_NOT_REMOVE" as any),
+    update: publicProcedure
+      .input(templateUpdateInput)
+      .output(templateOutput)
+      .mutation(async () => "PLACEHOLDER_DO_NOT_REMOVE" as any)
+    }),
   tracking: t.router({
     settings: publicProcedure
       .output(trackingSettingsOutput)
@@ -733,6 +878,19 @@ const appRouter = t.router({
 	}),
 ))
       .query(async () => "PLACEHOLDER_DO_NOT_REMOVE" as any)
+    }),
+  webhooks: t.router({
+    list: publicProcedure
+      .output(webhooksOutput)
+      .query(async () => "PLACEHOLDER_DO_NOT_REMOVE" as any),
+    create: publicProcedure
+      .input(webhookCreateInput)
+      .output(webhookCreateOutput)
+      .mutation(async () => "PLACEHOLDER_DO_NOT_REMOVE" as any),
+    update: publicProcedure
+      .input(webhookUpdateInput)
+      .output(webhookOutput)
+      .mutation(async () => "PLACEHOLDER_DO_NOT_REMOVE" as any)
     }),
   workspace: t.router({
     get: publicProcedure
