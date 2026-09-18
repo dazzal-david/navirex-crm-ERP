@@ -5,6 +5,7 @@ import { Suspense } from "react";
 import { AuthHeading, AuthShell } from "@/components/auth-shell";
 import { getSession } from "@/lib/session";
 import { getServerQueryClient, getServerTrpc } from "@/lib/trpc/server";
+import { PasswordSignIn } from "./password-sign-in";
 import { SocialSignIn } from "./social-sign-in";
 import { type SsoProvider, SsoSignIn } from "./sso-sign-in";
 
@@ -15,6 +16,7 @@ export const metadata: Metadata = {
 type SignInOptions = {
 	google: boolean;
 	microsoft: boolean;
+	password: boolean;
 	providers: SsoProvider[];
 };
 
@@ -75,6 +77,7 @@ async function SignIn({
 	if (options?.microsoft ?? false) configured.push("microsoft");
 
 	const providers = options?.providers ?? [];
+	const password = options?.password ?? false;
 
 	const insisted = configured.find((provider) => provider === method);
 	const showSso = providers.length > 0 && insisted === undefined;
@@ -85,7 +88,7 @@ async function SignIn({
 				? configured
 				: [];
 
-	if (!showSso && social.length === 0) {
+	if (!showSso && social.length === 0 && !password) {
 		return (
 			<>
 				<AuthHeading
@@ -109,6 +112,16 @@ async function SignIn({
 				title="Welcome back"
 				description="Sign in with your account to continue."
 			/>
+
+			{password ? <PasswordSignIn /> : null}
+
+			{password && (showSso || social.length > 0) ? (
+				<div className="flex w-full items-center gap-3 text-muted-foreground text-xs uppercase">
+					<span className="h-px flex-1 bg-border" />
+					or
+					<span className="h-px flex-1 bg-border" />
+				</div>
+			) : null}
 
 			{showSso ? <SsoSignIn providers={providers} /> : null}
 			{social.map((provider) => (

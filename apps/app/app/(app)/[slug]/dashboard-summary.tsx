@@ -10,183 +10,272 @@ import {
 	CardPanelEmpty,
 	CardTitle,
 } from "@crm/ui/components/card";
-import { CardTableEmpty } from "@crm/ui/components/card-table";
-import { Checkbox } from "@crm/ui/components/checkbox";
-import { EmptyCellValue } from "@crm/ui/components/empty-cell";
+import type { ChartConfig } from "@crm/ui/components/chart";
 import {
-	EntityLogo,
-	type EntityLogoTone,
-} from "@crm/ui/components/entity-logo";
+	ChartCard,
+	DashboardGrid,
+	DashboardRow,
+	DashboardSection,
+	KpiCard,
+} from "@crm/ui/components/dashboard";
 import {
 	SimpleTable,
 	type SimpleTableColumn,
 	SimpleTableRow,
 } from "@crm/ui/components/simple-table";
-import { Spinner } from "@crm/ui/components/spinner";
-import { StatusIndicator } from "@crm/ui/components/status-indicator";
+import { Skeleton } from "@crm/ui/components/skeleton";
+import { StatCard } from "@crm/ui/components/stat-card";
+import {
+	StatusIndicator,
+	type StatusTone,
+} from "@crm/ui/components/status-indicator";
 import { TableCell } from "@crm/ui/components/table";
-import { formatCount, formatMoneyCompact } from "@crm/ui/lib/format";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { formatCount } from "@crm/ui/lib/format";
+import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { useQueryState } from "nuqs";
-import type { CSSProperties, ReactNode } from "react";
-import { toast } from "sonner";
-import { DealStageIndicator } from "@/components/crm/deal-stage";
-import { RecordLink } from "@/components/crm/record-sheet/record-link";
+import type { CSSProperties } from "react";
 import { useOpenRecord } from "@/components/crm/record-sheet/record-stack";
+import { AreaTrend, DonutStat } from "@/components/dashboard-charts";
 import { LocalRelativeTime } from "@/components/local-date-time";
 import { activityLabel } from "@/lib/activity-presentation";
-import { dealStageColor } from "@/lib/deal-stage";
+import { LEAD_BOARD } from "@/lib/leads/board-config";
 import { SEARCH_PARAM } from "@/lib/search-param-keys";
-import { useCrmCache } from "@/lib/trpc/cache";
 import { useTRPC } from "@/lib/trpc/client";
 import { useWorkspaceUrl } from "@/lib/use-workspace-url";
 import { overviewParsers } from "./overview-search-params";
-import { SalesDashboard } from "./sales-dashboard";
 
 const CELL = "px-3 py-2.5 align-middle";
-const OPEN_COLUMNS: SimpleTableColumn[] = [
-	{ id: "deal", header: "Deal" },
+const LEAD_COLUMNS: SimpleTableColumn[] = [
+	{ id: "lead", header: "Lead" },
+	{ id: "stage", header: "Status", width: "w-32" },
 	{
-		id: "stage",
-		header: "Stage",
-		width: "w-32",
-		className: "hidden lg:table-cell",
+		id: "activity",
+		header: "Last activity",
+		width: "w-28",
+		align: "right",
 	},
-	{
-		id: "share",
-		srLabel: "Share of the largest",
-		width: "w-24",
-		className: "hidden sm:table-cell",
-	},
-	{ id: "value", header: "Value", width: "w-20", align: "right" },
 ];
-const TASK_COLUMNS: SimpleTableColumn[] = [
-	{ id: "done", srLabel: "Done", width: "w-8" },
-	{ id: "task", header: "Task" },
-	{ id: "overdue", header: "Overdue", width: "w-24", align: "right" },
+const UPDATE_COLUMNS: SimpleTableColumn[] = [
+	{ id: "update", header: "Update" },
+	{ id: "lead", header: "Lead", width: "w-44" },
+	{ id: "when", header: "When", width: "w-24", align: "right" },
 ];
-const ACTIVITY_COLUMNS: SimpleTableColumn[] = [
-	{ id: "activity", header: "Activity" },
-	{
-		id: "company",
-		header: "Company",
-		width: "w-44",
-		className: "hidden md:table-cell",
-	},
-	{
-		id: "deal",
-		header: "Deal",
-		width: "w-48",
-		className: "hidden lg:table-cell",
-	},
-	{
-		id: "who",
-		header: "Who",
-		width: "w-32",
-		className: "hidden md:table-cell",
-	},
-	{ id: "when", header: "When", width: "w-20", align: "right" },
-];
+const TREND_CONFIG: ChartConfig = {
+	created: { label: "New leads", color: "var(--chart-1)" },
+};
+const SOURCE_COLORS = [
+	"var(--chart-1)",
+	"var(--chart-2)",
+	"var(--chart-3)",
+	"var(--chart-4)",
+	"var(--chart-5)",
+] as const;
+const LOADING_CARDS = ["total", "new", "attention", "unassigned"] as const;
+const STAGE_TONE = {
+	UNASSIGNED: "warning",
+	ASSIGNED: "neutral",
+	TALKING: "info",
+	INTERESTED: "primary",
+	REJECTED: "error",
+	APPROVED: "success",
+} satisfies Record<(typeof LEAD_BOARD.stages)[number], StatusTone>;
 
 export function DashboardSummary() {
 	const trpc = useTRPC();
-	const cache = useCrmCache();
 	const openRecord = useOpenRecord();
 	const workspaceUrl = useWorkspaceUrl();
-
 	const [scope] = useQueryState(
 		SEARCH_PARAM.overview.scope,
 		overviewParsers[SEARCH_PARAM.overview.scope],
 	);
-
 	const summaryQuery = useQuery({
-		...trpc.dashboard.summary.queryOptions({ scope }),
+		...trpc.dashboard.leadOverview.queryOptions({ scope }),
 		placeholderData: (previous) => previous,
 	});
-
-	const complete = useMutation(
-		trpc.activities.complete.mutationOptions({
-			onSuccess: () => cache.activity(),
-			onError: (error) => toast.error(error.message),
-		}),
-	);
-
 	const summary = summaryQuery.data;
 
-	if (!summary) {
-		return (
-			<div className="flex flex-1 justify-center py-12">
-				<Spinner />
-			</div>
-		);
-	}
+	if (!summary) return <DashboardLoading />;
 
-	const { biggestOpen, overdueTasks, recentActivity } = summary;
-
-	const mine = scope === "me";
-	const largestOpenCents = biggestOpen[0]?.baseAmountCents ?? 0;
+	const sourceSlices = summary.sources.map((source, index) => ({
+		key: `source-${index}`,
+		label: source.source,
+		value: source.count,
+		color: SOURCE_COLORS[index % SOURCE_COLORS.length] ?? SOURCE_COLORS[0],
+	}));
+	const hasTrend = summary.trend.some((point) => point.created > 0);
+	const weekDelta = changeDelta(
+		summary.totals.newThisWeek,
+		summary.totals.newPreviousWeek,
+	);
 
 	return (
 		<div className="flex flex-col gap-6">
-			<SalesDashboard summary={summary} />
+			<div className="grid overflow-hidden border sm:grid-cols-2 xl:grid-cols-4 [&>*:nth-child(n+2)]:border-t sm:[&>*:nth-child(2)]:border-t-0 sm:[&>*:nth-child(2n)]:border-l xl:[&>*]:border-t-0 xl:[&>*]:border-l xl:[&>*:first-child]:border-l-0">
+				<StatCard
+					label="Total leads"
+					value={summary.totals.all}
+					description={`${formatCount(summary.totals.active, "lead")} still active`}
+				/>
+				<StatCard
+					label="New this week"
+					value={summary.totals.newThisWeek}
+					delta={weekDelta}
+					description={`${summary.totals.newPreviousWeek} in the previous seven days`}
+				/>
+				<StatCard
+					label="Needs attention"
+					value={summary.totals.needsAttention}
+					description="Active leads without activity for seven days"
+				/>
+				<StatCard
+					label="Unassigned"
+					value={summary.totals.unassigned}
+					description="New leads waiting for an owner"
+				/>
+			</div>
 
-			<div className="grid gap-6 @3xl/page-content:grid-cols-2">
+			<DashboardSection
+				title="Lead status"
+				description="Every lead stage across the current dashboard scope"
+				action={
+					<Button asChild variant="outline" size="sm">
+						<Link href={workspaceUrl("/leads")}>Open board</Link>
+					</Button>
+				}
+			>
+				<DashboardGrid columns={3}>
+					{summary.stages.map((stage) => (
+						<KpiCard key={stage.stage} title={LEAD_BOARD.label[stage.stage]}>
+							<div className="flex items-end justify-between gap-4">
+								<span className="font-medium text-3xl tracking-tight tabular-nums">
+									{stage.count}
+								</span>
+								<StatusIndicator
+									tone={STAGE_TONE[stage.stage]}
+									size="sm"
+									label={percentage(stage.count, summary.totals.all)}
+								/>
+							</div>
+							<Progress value={stage.count} total={summary.totals.all} />
+						</KpiCard>
+					))}
+				</DashboardGrid>
+			</DashboardSection>
+
+			<DashboardRow split="hero">
+				<ChartCard
+					title="Lead intake"
+					description="New leads received during the last fourteen days"
+					footer={`${formatCount(summary.totals.newThisWeek, "lead")} received this week`}
+				>
+					{hasTrend ? (
+						<AreaTrend
+							data={summary.trend}
+							config={TREND_CONFIG}
+							xKey="label"
+							height={220}
+							variant="gradient"
+							bloom="low"
+							formatValue={(value) => formatCount(Number(value), "lead")}
+						/>
+					) : (
+						<EmptyChart label="No leads arrived during this period" />
+					)}
+				</ChartCard>
+
+				<ChartCard
+					title="Lead sources"
+					description="Where current leads entered the CRM"
+				>
+					{sourceSlices.length > 0 ? (
+						<div className="flex flex-col gap-3 px-5 md:px-6">
+							<DonutStat
+								data={sourceSlices}
+								height={160}
+								centerValue={summary.totals.all}
+								centerLabel="leads"
+							/>
+							<ul className="flex flex-col">
+								{sourceSlices.map((source) => (
+									<li
+										key={source.key}
+										className="flex items-center gap-2 border-t py-2 text-xs first:border-t-0"
+									>
+										<span
+											aria-hidden
+											className="size-1.5 shrink-0"
+											style={{ backgroundColor: source.color }}
+										/>
+										<span className="min-w-0 flex-1 truncate">
+											{source.label}
+										</span>
+										<span className="tabular-nums text-muted-foreground">
+											{source.value}
+										</span>
+									</li>
+								))}
+							</ul>
+						</div>
+					) : (
+						<EmptyChart label="No source data yet" />
+					)}
+				</ChartCard>
+			</DashboardRow>
+
+			<div className="grid gap-6 @4xl/page-content:grid-cols-2">
 				<Card className="min-w-0">
 					<CardHeader>
-						<CardTitle>Deals in progress</CardTitle>
+						<CardTitle>Needs attention</CardTitle>
 						<CardDescription>
-							The largest open deals, and how long each has sat in its stage
+							Old active leads and{" "}
+							{formatCount(summary.overdueTasks.length, "overdue task")}
 						</CardDescription>
 						<CardAction>
 							<Button asChild variant="contrast" size="sm">
-								<Link href={workspaceUrl("/deals")}>Open deals</Link>
+								<Link href={workspaceUrl("/leads")}>Review leads</Link>
 							</Button>
 						</CardAction>
 					</CardHeader>
 					<CardPanel>
-						{biggestOpen.length === 0 ? (
-							<CardPanelEmpty>
-								Nothing open. Time to fill the pipeline.
-							</CardPanelEmpty>
+						{summary.priorityLeads.length === 0 ? (
+							<CardPanelEmpty>No active leads need attention.</CardPanelEmpty>
 						) : (
 							<SimpleTable
 								variant="panel"
 								surface="page"
-								columns={OPEN_COLUMNS}
+								columns={LEAD_COLUMNS}
 							>
-								{biggestOpen.map((deal) => (
+								{summary.priorityLeads.map((lead) => (
 									<SimpleTableRow
-										key={deal.id}
+										key={lead.id}
 										clickable
-										onClick={() => openRecord({ kind: "deal", id: deal.id })}
+										onClick={() => openRecord({ kind: "lead", id: lead.id })}
 									>
 										<TableCell className={CELL}>
-											<DealCell
-												name={deal.name}
-												company={deal.company}
-												meta={<LocalRelativeTime date={deal.stageChangedAt} />}
+											<span className="flex min-w-0 flex-col">
+												<span className="truncate font-medium">
+													{lead.name}
+												</span>
+												<span className="truncate text-muted-foreground">
+													{lead.companyName ?? lead.owner?.name ?? "No company"}
+												</span>
+											</span>
+										</TableCell>
+										<TableCell className={CELL}>
+											<StatusIndicator
+												tone={STAGE_TONE[lead.stage]}
+												size="sm"
+												label={LEAD_BOARD.label[lead.stage]}
 											/>
 										</TableCell>
-										<TableCell className={`${CELL} hidden lg:table-cell`}>
-											<DealStageIndicator stage={deal.stage} />
-										</TableCell>
-										<TableCell className={`${CELL} hidden sm:table-cell`}>
-											<ValueMeter
-												share={
-													largestOpenCents > 0
-														? ((deal.baseAmountCents ?? 0) / largestOpenCents) *
-															100
-														: 0
-												}
-												color={dealStageColor(deal.stage)}
-											/>
-										</TableCell>
-										<TableCell className={`${CELL} text-right tabular-nums`}>
-											{deal.amountCents === null ? (
-												<EmptyCellValue />
+										<TableCell
+											className={`${CELL} text-right text-muted-foreground`}
+										>
+											{lead.lastActivityAt ? (
+												<LocalRelativeTime date={lead.lastActivityAt} />
 											) : (
-												formatMoneyCompact(deal.amountCents, deal.currency)
+												"Never"
 											)}
 										</TableCell>
 									</SimpleTableRow>
@@ -198,61 +287,47 @@ export function DashboardSummary() {
 
 				<Card className="min-w-0">
 					<CardHeader>
-						<CardTitle>Overdue tasks</CardTitle>
+						<CardTitle>Important updates</CardTitle>
 						<CardDescription>
-							{overdueTasks.length === 0
-								? "Every task you have logged is either done or still to come"
-								: `${formatCount(overdueTasks.length, "task")} past due`}
+							Recent notes, tasks, and status changes
 						</CardDescription>
 					</CardHeader>
 					<CardPanel>
-						{overdueTasks.length === 0 ? (
-							<CardPanelEmpty>Nothing overdue. Good.</CardPanelEmpty>
+						{summary.recentUpdates.length === 0 ? (
+							<CardPanelEmpty>No lead updates yet.</CardPanelEmpty>
 						) : (
 							<SimpleTable
 								variant="panel"
 								surface="page"
-								columns={TASK_COLUMNS}
+								columns={UPDATE_COLUMNS}
 							>
-								{overdueTasks.map((task) => (
-									<SimpleTableRow key={task.id}>
-										<TableCell className={CELL}>
-											<Checkbox
-												checked={false}
-												disabled={complete.isPending}
-												aria-label="Mark as done"
-												onCheckedChange={() =>
-													complete.mutate({ id: task.id, completed: true })
-												}
-											/>
-										</TableCell>
+								{summary.recentUpdates.map((update) => (
+									<SimpleTableRow
+										key={update.id}
+										clickable
+										onClick={() =>
+											openRecord({ kind: "lead", id: update.lead.id })
+										}
+									>
 										<TableCell className={CELL}>
 											<span className="flex min-w-0 flex-col">
-												<span className="truncate">{task.subject}</span>
-												<span className="flex min-w-0 text-muted-foreground">
-													{task.deal ? (
-														<RecordLink kind="deal" id={task.deal.id}>
-															{task.deal.name}
-														</RecordLink>
-													) : task.company ? (
-														<RecordLink kind="company" id={task.company.id}>
-															{task.company.name}
-														</RecordLink>
-													) : null}
+												<span className="truncate">
+													{update.subject ??
+														update.body ??
+														activityLabel(update.type)}
+												</span>
+												<span className="truncate text-muted-foreground">
+													{update.createdBy.name}
 												</span>
 											</span>
 										</TableCell>
-										<TableCell className={`${CELL} text-right`}>
-											<StatusIndicator
-												tone="error"
-												label={
-													task.dueAt ? (
-														<LocalRelativeTime date={task.dueAt} />
-													) : (
-														"No due date"
-													)
-												}
-											/>
+										<TableCell className={CELL}>
+											<span className="truncate">{update.lead.name}</span>
+										</TableCell>
+										<TableCell
+											className={`${CELL} text-right text-muted-foreground`}
+										>
+											<LocalRelativeTime date={update.createdAt} />
 										</TableCell>
 									</SimpleTableRow>
 								))}
@@ -262,124 +337,84 @@ export function DashboardSummary() {
 				</Card>
 			</div>
 
-			<Card className="min-w-0">
-				<CardHeader>
-					<CardTitle>
-						{mine ? "Your recent activity" : "Recent activity"}
-					</CardTitle>
-					<CardDescription>
-						{mine
-							? "Every note, task and stage change you have logged"
-							: "Every note, task and stage change across the workspace"}
-					</CardDescription>
-					<CardAction>
-						<Button asChild variant="contrast" size="sm">
-							<Link href={workspaceUrl("/companies")}>All companies</Link>
-						</Button>
-					</CardAction>
-				</CardHeader>
-				{recentActivity.length === 0 ? (
-					<CardTableEmpty>Nothing has happened yet.</CardTableEmpty>
-				) : (
-					<SimpleTable columns={ACTIVITY_COLUMNS}>
-						{recentActivity.map((entry) => (
-							<SimpleTableRow key={entry.id}>
-								<TableCell className={CELL}>
-									<span className="truncate">
-										{entry.subject ?? activityLabel(entry.type)}
-									</span>
-								</TableCell>
-								<TableCell className={`${CELL} hidden md:table-cell`}>
-									{entry.company ? (
-										<RecordLink kind="company" id={entry.company.id}>
-											{entry.company.name}
-										</RecordLink>
-									) : (
-										<EmptyCellValue />
-									)}
-								</TableCell>
-								<TableCell className={`${CELL} hidden lg:table-cell`}>
-									{entry.deal ? (
-										<RecordLink kind="deal" id={entry.deal.id}>
-											{entry.deal.name}
-										</RecordLink>
-									) : (
-										<EmptyCellValue />
-									)}
-								</TableCell>
-								<TableCell
-									className={`${CELL} hidden truncate text-muted-foreground md:table-cell`}
-								>
-									{entry.createdBy.name}
-								</TableCell>
-								<TableCell
-									className={`${CELL} text-right text-muted-foreground`}
-								>
-									<LocalRelativeTime date={entry.createdAt} />
-								</TableCell>
-							</SimpleTableRow>
-						))}
-					</SimpleTable>
-				)}
-			</Card>
+			<DashboardSection
+				title="Navirex coverage"
+				description="Lead distribution across operating entities"
+			>
+				<div className="grid overflow-hidden border sm:grid-cols-3 sm:[&>*+*]:border-l">
+					{summary.entities.map((entity) => (
+						<StatCard
+							key={entity.entity ?? "unassigned"}
+							label={
+								entity.entity
+									? LEAD_BOARD.entityName[entity.entity]
+									: "Entity not selected"
+							}
+							value={entity.count}
+							description={percentage(entity.count, summary.totals.all)}
+						/>
+					))}
+				</div>
+			</DashboardSection>
 		</div>
 	);
 }
 
-function DealCell({
-	name,
-	company,
-	meta,
-}: {
-	name: string;
-	company: {
-		name: string;
-		iconUrl: string | null;
-		iconDarkUrl: string | null;
-		iconTone: string | null;
-	};
-	meta?: ReactNode;
-}) {
+function Progress({ value, total }: { value: number; total: number }) {
+	const width = total === 0 ? 0 : Math.round((value / total) * 100);
 	return (
-		<span className="flex min-w-0 items-center gap-2">
-			<EntityLogo
-				src={company.iconUrl}
-				darkSrc={company.iconDarkUrl}
-				tone={company.iconTone as EntityLogoTone | null | undefined}
-				name={company.name}
-				size="sm"
-			/>
-			<span className="flex min-w-0 flex-col">
-				<span className="truncate font-medium">{name}</span>
-				<span className="truncate text-muted-foreground">
-					{meta ? (
-						<>
-							{company.name} · {meta}
-						</>
-					) : (
-						company.name
-					)}
-				</span>
-			</span>
-		</span>
-	);
-}
-
-function ValueMeter({ share, color }: { share: number; color: string }) {
-	return (
-		<span
-			className="bloom-low flex h-1.5 w-full overflow-hidden bg-muted"
-			style={{ "--bloom-color": color } as CSSProperties}
-		>
-			<span
-				className="h-full w-(--share)"
+		<div className="h-1.5 overflow-hidden bg-muted">
+			<div
+				className="h-full bg-primary"
 				style={
 					{
-						backgroundColor: color,
-						"--share": `${Math.round(Math.max(Math.min(share, 100), 0))}%`,
+						"--progress": `${width}%`,
+						width: "var(--progress)",
 					} as CSSProperties
 				}
 			/>
-		</span>
+		</div>
 	);
+}
+
+function EmptyChart({ label }: { label: string }) {
+	return (
+		<div className="flex h-56 items-center justify-center px-6 text-center text-muted-foreground text-sm">
+			{label}
+		</div>
+	);
+}
+
+function DashboardLoading() {
+	return (
+		<div className="flex flex-col gap-6" aria-busy="true">
+			<div className="grid gap-px border bg-border sm:grid-cols-2 xl:grid-cols-4">
+				{LOADING_CARDS.map((card) => (
+					<div key={card} className="flex flex-col gap-3 bg-background p-6">
+						<Skeleton className="h-4 w-24" />
+						<Skeleton className="h-8 w-14" />
+						<Skeleton className="h-3 w-36" />
+					</div>
+				))}
+			</div>
+			<Skeleton className="h-64 w-full rounded-lg" />
+			<Skeleton className="h-72 w-full rounded-lg" />
+		</div>
+	);
+}
+
+function changeDelta(current: number, previous: number) {
+	if (previous === 0) return undefined;
+	const value = Math.round(((current - previous) / previous) * 100);
+	return {
+		value: `${value >= 0 ? "+" : ""}${value}%`,
+		direction: value > 0 ? "up" : value < 0 ? "down" : "neutral",
+		label: "vs. prior week",
+	} as const;
+}
+
+function percentage(value: number, total: number): string {
+	return total === 0
+		? "0% of leads"
+		: `${Math.round((value / total) * 100)}% of leads`;
 }

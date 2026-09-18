@@ -10,13 +10,13 @@ export function OverviewGreetingFallback() {
 		<>
 			<PageShellTitle>Welcome back</PageShellTitle>
 			<PageShellDescription>
-				What you have closed, what is still in play, and what needs you today.
+				Your lead flow, follow-ups, and important updates for today.
 			</PageShellDescription>
 		</>
 	);
 }
 
-export function OverviewGreeting() {
+export function OverviewGreeting({ name }: { name: string }) {
 	const [scope] = useQueryState(
 		SEARCH_PARAM.overview.scope,
 		overviewParsers[SEARCH_PARAM.overview.scope],
@@ -24,12 +24,16 @@ export function OverviewGreeting() {
 
 	return (
 		<>
-			<PageShellTitle>Welcome back</PageShellTitle>
+			<PageShellTitle>Welcome back, {firstName(name)}</PageShellTitle>
 			<PageShellDescription>
 				{scope === "me"
-					? "What you have closed, what is still in play, and what needs you today."
-					: "What the team has closed, what is still in play, and what needs you today."}
+					? "Your lead flow, follow-ups, and important updates for today."
+					: "The team's lead flow, follow-ups, and important updates for today."}
 			</PageShellDescription>
 		</>
 	);
+}
+
+function firstName(name: string): string {
+	return name.trim().split(/\s+/)[0] || "there";
 }

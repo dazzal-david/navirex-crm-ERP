@@ -1,6 +1,9 @@
 "use client";
 
+import Chat from "@carbon/icons-react/es/Chat";
+import LogoFacebook from "@carbon/icons-react/es/LogoFacebook";
 import Plug from "@carbon/icons-react/es/Plug";
+import Upload from "@carbon/icons-react/es/Upload";
 import DocusignLogo from "@crm/ui/components/brand-logos/docusign";
 import GoogleLogo from "@crm/ui/components/brand-logos/google";
 import MicrosoftLogo from "@crm/ui/components/brand-logos/microsoft";
@@ -33,7 +36,7 @@ export function AddConnectionDialog({
 				if (!next) router.replace(`/${slug}/settings/connections`);
 			}}
 		>
-			<DialogContent className="max-w-(--container-narrow) gap-0 p-0 md:left-[calc(50%+calc((56px+213px)/2))]">
+			<DialogContent className="max-w-(--container-narrow) gap-0 p-0 md:left-[calc(50%+calc((var(--width-app-navigation)+213px)/2))]">
 				<DialogHeader className="gap-2 px-(--spacing-block-inline) pt-5 pb-4">
 					<DialogTitle className="text-base">Add a connection</DialogTitle>
 					<DialogDescription>
@@ -66,6 +69,24 @@ export function AddConnectionDialog({
 						/>
 					) : null}
 					<CatalogRow
+						logo={LogoFacebook}
+						name="Meta Lead Ads"
+						description="Bring Facebook and Instagram lead forms into the lead board"
+						href={`/${slug}/settings/connections/meta`}
+					/>
+					<CatalogRow
+						logo={Chat}
+						name="WhatsApp Cloud API"
+						description="Send messages and approved templates from lead records"
+						href={`/${slug}/settings/connections/whatsapp`}
+					/>
+					<CatalogRow
+						logo={Upload}
+						name="Zoho CRM migration"
+						description="Import Zoho leads safely from a CSV export"
+						href={`/${slug}/settings/connections/zoho`}
+					/>
+					<CatalogRow
 						logo={StripeLogo}
 						name="Stripe"
 						description="Coming soon"
@@ -78,7 +99,7 @@ export function AddConnectionDialog({
 					<CatalogRow
 						logo={Plug}
 						name="Anything else"
-						description="The intake API is not available yet"
+						description="Create leads through the secured intake API"
 						href={`/${slug}/settings/connections/intake`}
 					/>
 				</div>

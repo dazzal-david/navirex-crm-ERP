@@ -1,4 +1,4 @@
-import type { RecordKind } from "@/components/crm/record-sheet/record-stack";
+import type { FieldEntityKind } from "@/components/crm/record-sheet/record-stack";
 import type { FieldEntity } from "./fields-entity";
 
 export const SHEET_TITLE = "Fields";
@@ -7,9 +7,9 @@ const SUBTITLE = {
 	company: "This shapes every company in your CRM.",
 	contact: "This shapes every contact in your CRM.",
 	deal: "This shapes every deal in your CRM.",
-} satisfies Record<RecordKind, string>;
+} satisfies Record<FieldEntityKind, string>;
 
-export function subtitleFor(kind: RecordKind): string {
+export function subtitleFor(kind: FieldEntityKind): string {
 	return SUBTITLE[kind];
 }
 
@@ -95,4 +95,4 @@ export const ENTITY_TABS = [
 	{ kind: "company", label: "Companies" },
 	{ kind: "contact", label: "Contacts" },
 	{ kind: "deal", label: "Deals" },
-] as const satisfies readonly { kind: RecordKind; label: string }[];
+] as const satisfies readonly { kind: FieldEntityKind; label: string }[];

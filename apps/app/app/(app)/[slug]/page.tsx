@@ -27,7 +27,7 @@ export default function OverviewPage({ searchParams }: PageProps<"/[slug]">) {
 			<PageShellHeader>
 				<PageShellHeading>
 					<Suspense fallback={<OverviewGreetingFallback />}>
-						<OverviewGreeting />
+						<Greeting />
 					</Suspense>
 				</PageShellHeading>
 				<PageShellActions>
@@ -46,6 +46,11 @@ export default function OverviewPage({ searchParams }: PageProps<"/[slug]">) {
 	);
 }
 
+async function Greeting() {
+	const { user } = await requireSession();
+	return <OverviewGreeting name={user.name} />;
+}
+
 async function Summary({
 	searchParams,
 }: Pick<PageProps<"/[slug]">, "searchParams">) {
@@ -56,7 +61,7 @@ async function Summary({
 
 	const queryClient = getServerQueryClient();
 	await queryClient.prefetchQuery(
-		getServerTrpc().dashboard.summary.queryOptions({ scope }),
+		getServerTrpc().dashboard.leadOverview.queryOptions({ scope }),
 	);
 
 	return (

@@ -35,7 +35,8 @@ const stageChange = z
 function anchorId(anchor: TimelineAnchor): string {
 	if ("companyId" in anchor) return anchor.companyId;
 	if ("contactId" in anchor) return anchor.contactId;
-	return anchor.dealId;
+	if ("dealId" in anchor) return anchor.dealId;
+	return anchor.leadId;
 }
 
 export function TimelineEntry({

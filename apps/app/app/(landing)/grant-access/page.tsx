@@ -9,8 +9,6 @@ export const metadata: Metadata = {
 	title: "Grant access",
 };
 
-export const instant = false;
-
 const DESCRIPTION = {
 	google:
 		"This CRM reads your Gmail and Calendar so meetings and email threads show up on the right company. It is read-only — nothing is ever sent on your behalf.",

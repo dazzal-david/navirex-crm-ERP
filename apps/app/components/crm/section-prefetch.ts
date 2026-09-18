@@ -18,7 +18,7 @@ export function usePrefetchSection(): (section: string) => void {
 			switch (section) {
 				case "/":
 					void queryClient.prefetchQuery(
-						trpc.dashboard.summary.queryOptions({ scope: "me" }),
+						trpc.dashboard.leadOverview.queryOptions({ scope: "me" }),
 					);
 					return;
 				case "/companies":

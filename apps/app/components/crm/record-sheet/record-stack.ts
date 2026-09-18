@@ -10,9 +10,13 @@ import { useCallback, useMemo } from "react";
 import { timelineTabParser } from "@/components/crm/timeline/timeline-search-params";
 import { SEARCH_PARAM } from "@/lib/search-param-keys";
 
-const RECORD_KINDS = ["company", "contact", "deal"] as const;
+const RECORD_KINDS = ["company", "contact", "deal", "lead"] as const;
+
+const FIELD_ENTITY_KINDS = ["company", "contact", "deal"] as const;
 
 export type RecordKind = (typeof RECORD_KINDS)[number];
+
+export type FieldEntityKind = (typeof FIELD_ENTITY_KINDS)[number];
 
 export type RecordRef = { kind: RecordKind; id: string };
 
@@ -32,7 +36,7 @@ const params = {
 	[SEARCH_PARAM.record.tab]: parseAsString,
 	[SEARCH_PARAM.record.add]: parseAsStringLiteral(RECORD_FORMS),
 	[SEARCH_PARAM.record.thread]: parseAsString,
-	[SEARCH_PARAM.fieldsSheet.entity]: parseAsStringLiteral(RECORD_KINDS),
+	[SEARCH_PARAM.fieldsSheet.entity]: parseAsStringLiteral(FIELD_ENTITY_KINDS),
 	[SEARCH_PARAM.fieldsSheet.field]: parseAsString,
 	[SEARCH_PARAM.record.timeline]: timelineTabParser,
 };
@@ -115,7 +119,7 @@ export function useFieldsSheet() {
 	const field = values[SEARCH_PARAM.fieldsSheet.field];
 
 	const open = useCallback(
-		(kind: RecordKind) =>
+		(kind: FieldEntityKind) =>
 			void setParams({
 				[SEARCH_PARAM.fieldsSheet.entity]: kind,
 				[SEARCH_PARAM.fieldsSheet.field]: null,

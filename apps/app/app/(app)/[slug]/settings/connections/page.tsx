@@ -1,3 +1,8 @@
+import Chat from "@carbon/icons-react/es/Chat";
+import Code from "@carbon/icons-react/es/Code";
+import LogoFacebook from "@carbon/icons-react/es/LogoFacebook";
+import Plug from "@carbon/icons-react/es/Plug";
+import Upload from "@carbon/icons-react/es/Upload";
 import GoogleLogo from "@crm/ui/components/brand-logos/google";
 import MicrosoftLogo from "@crm/ui/components/brand-logos/microsoft";
 import SlackLogo from "@crm/ui/components/brand-logos/slack";
@@ -30,19 +35,79 @@ async function ConnectionsSettingsPageContent({
 	const [{ slug }, query] = await Promise.all([params, searchParams]);
 	const queryClient = getServerQueryClient();
 	const trpc = getServerTrpc();
-	const [google, microsoft, slack] = await Promise.all([
-		queryClient.fetchQuery(trpc.google.status.queryOptions()),
-		queryClient.fetchQuery(trpc.microsoft.status.queryOptions()),
-		queryClient.fetchQuery(trpc.slack.status.queryOptions()),
-	]);
+	const [google, microsoft, slack, tracking, meta, communications] =
+		await Promise.all([
+			queryClient.fetchQuery(trpc.google.status.queryOptions()),
+			queryClient.fetchQuery(trpc.microsoft.status.queryOptions()),
+			queryClient.fetchQuery(trpc.slack.status.queryOptions()),
+			queryClient.fetchQuery(trpc.tracking.settings.queryOptions()),
+			queryClient.fetchQuery(trpc.meta.status.queryOptions()),
+			queryClient.fetchQuery(trpc.communications.status.queryOptions()),
+		]);
 	const rows = [
+		{
+			name: "Inbound webhooks",
+			status: "Ready",
+			bringsIn: "Leads and messages from forms, Fresh, and external systems",
+			sends: "Nothing outside this CRM",
+			href: `/${slug}/settings/connections/webhooks`,
+			logo: Plug,
+		},
+		{
+			name: "Website forms",
+			status: tracking.paused
+				? "Paused"
+				: tracking.ready
+					? "Ready"
+					: "Setup required",
+			bringsIn: "Website visitors, campaign attribution, and form submissions",
+			sends: "Nothing outside this CRM",
+			href: `/${slug}/settings/tracking`,
+			logo: Code,
+		},
+		{
+			name: "Lead intake API",
+			status: "Ready",
+			bringsIn: "Authenticated lead records from websites and external systems",
+			sends: "Nothing outside this CRM",
+			href: `/${slug}/settings/connections/intake`,
+			logo: Plug,
+		},
+		{
+			name: "Zoho CRM migration",
+			status: "Ready",
+			bringsIn: "Zoho lead exports with safe repeat imports",
+			sends: "Nothing outside this CRM",
+			href: `/${slug}/settings/connections/zoho`,
+			logo: Upload,
+		},
+		{
+			name: "Meta Lead Ads",
+			status: meta.linked
+				? `${meta.pages.length} pages connected`
+				: "Setup required",
+			bringsIn: "Facebook and Instagram instant-form leads",
+			sends: "Webhook subscriptions and lead retrieval requests",
+			href: `/${slug}/settings/connections/meta`,
+			logo: LogoFacebook,
+		},
+		{
+			name: "WhatsApp Cloud API",
+			status: communications.whatsapp ? "Ready" : "Setup required",
+			bringsIn: "Delivery responses from Meta",
+			sends: "Conversation messages and approved templates",
+			href: `/${slug}/settings/connections/whatsapp`,
+			logo: Chat,
+		},
 		...(google.linked
 			? [
 					{
 						name: "Google Workspace",
 						status: "Connected",
 						bringsIn: "Emails, meetings and the people on them",
-						sends: "Nothing yet",
+						sends: communications.email.google
+							? "Outbound lead emails"
+							: "Reconnect to enable sending",
 						href: `/${slug}/settings/connections/google`,
 						logo: GoogleLogo,
 					},
@@ -68,7 +133,9 @@ async function ConnectionsSettingsPageContent({
 						name: "Microsoft 365",
 						status: "Connected",
 						bringsIn: "Outlook email and the people on it",
-						sends: "Nothing yet",
+						sends: communications.email.microsoft
+							? "Outbound lead emails"
+							: "Reconnect to enable sending",
 						href: `/${slug}/settings/connections/microsoft`,
 						logo: MicrosoftLogo,
 					},
@@ -115,6 +182,12 @@ async function ConnectionsSettingsPageContent({
 						</p>
 					</div>
 					<div className="flex flex-col divide-y rounded-lg border bg-card px-(--spacing-block-inline)">
+						<StarterRow
+							logo={Code}
+							name="Website forms"
+							description="Capture form submissions from every Navirex website"
+							href={`/${slug}/settings/tracking`}
+						/>
 						<StarterRow
 							logo={GoogleLogo}
 							name="Google Workspace"

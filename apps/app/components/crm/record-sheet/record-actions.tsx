@@ -27,25 +27,25 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { useCrmCache } from "@/lib/trpc/cache";
 import { useTRPC } from "@/lib/trpc/client";
-import {
-	type RecordKind,
-	type RecordRef,
-	useRecordStack,
-} from "./record-stack";
+import { useRecordStack } from "./record-stack";
+
+type ArchivableKind = "company" | "contact" | "deal";
+
+type ArchivableRef = { kind: ArchivableKind; id: string };
 
 const NOUN = {
 	company: "company",
 	contact: "contact",
 	deal: "deal",
-} satisfies Record<RecordKind, string>;
+} satisfies Record<ArchivableKind, string>;
 
 const RECORD_PROCEDURES = {
 	company: "companies",
 	contact: "contacts",
 	deal: "deals",
-} satisfies Record<RecordKind, "companies" | "contacts" | "deals">;
+} satisfies Record<ArchivableKind, "companies" | "contacts" | "deals">;
 
-function useArchiveRecord(record: RecordRef) {
+function useArchiveRecord(record: ArchivableRef) {
 	const trpc = useTRPC();
 	const cache = useCrmCache();
 
@@ -64,7 +64,7 @@ function useArchiveRecord(record: RecordRef) {
 	);
 }
 
-function useRestoreRecord(record: RecordRef) {
+function useRestoreRecord(record: ArchivableRef) {
 	const trpc = useTRPC();
 	const cache = useCrmCache();
 
@@ -83,7 +83,7 @@ function useRestoreRecord(record: RecordRef) {
 	);
 }
 
-function usePurgeRecord(record: RecordRef) {
+function usePurgeRecord(record: ArchivableRef) {
 	const trpc = useTRPC();
 	const cache = useCrmCache();
 	const { close } = useRecordStack();
@@ -110,7 +110,7 @@ export function RecordActions({
 	consequence,
 	archivedAt,
 }: {
-	record: RecordRef;
+	record: ArchivableRef;
 	name: string;
 	consequence: string;
 	archivedAt: string | null;
