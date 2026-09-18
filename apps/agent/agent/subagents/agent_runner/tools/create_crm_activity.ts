@@ -8,7 +8,7 @@ export default defineTool({
 		"Create an approved internal CRM note or task on an approved record. The version must allow the exact activity type. The action is logged before it executes and is idempotent across retries.",
 	inputSchema: z.object({
 		type: z.enum(["NOTE", "TASK"]),
-		targetKind: z.enum(["company", "contact", "deal"]),
+		targetKind: z.enum(["company", "contact", "deal", "lead"]),
 		targetId: z.string().min(1),
 		subject: z.string().trim().max(240).nullish(),
 		body: z.string().trim().max(10_000).nullish(),

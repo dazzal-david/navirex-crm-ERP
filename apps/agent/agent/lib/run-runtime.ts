@@ -53,6 +53,16 @@ export type RunHistorySources = {
 	calendar: boolean;
 };
 
+type PinnedLeadTemplate = {
+	id: string;
+	name: string;
+	channel: "EMAIL" | "WHATSAPP";
+	subject: string | null;
+	body: string;
+	providerTemplateName: string | null;
+	language: string;
+};
+
 type SlackRequestBody = Record<string, Json>;
 
 type HashableRequest = Record<string, string | boolean | null>;
@@ -199,7 +209,7 @@ export async function queryRunCrm(
 export async function readRunRecord(
 	runId: string,
 	input: {
-		kind: "contact" | "company" | "deal";
+		kind: "contact" | "company" | "deal" | "lead";
 		id: string;
 	},
 ) {
@@ -207,6 +217,7 @@ export async function readRunRecord(
 	assertResourceAllowed(run.recordScope, run.allowedResources, input);
 	const sources = allowedHistorySources(run.allowedResources);
 
+	if (input.kind === "lead") return readLead(input.id);
 	if (input.kind === "contact")
 		return readCrmHistory(input.id, {
 			threads: 10,
@@ -233,7 +244,7 @@ export async function createRunActivity(
 	callId: string,
 	input: {
 		type: "NOTE" | "TASK";
-		targetKind: "company" | "contact" | "deal";
+		targetKind: "company" | "contact" | "deal" | "lead";
 		targetId: string;
 		subject?: string | null;
 		body?: string | null;
@@ -327,6 +338,7 @@ export async function createRunActivity(
 					companyId: target.companyId,
 					contactId: target.contactId,
 					dealId: target.dealId,
+					leadId: target.leadId,
 					createdById: run.initiatedById ?? run.agent.createdById,
 					meta: {
 						source: "agent",
@@ -356,6 +368,12 @@ export async function createRunActivity(
 					data: { lastActivityAt: now },
 				});
 			}
+			if (target.leadId) {
+				await tx.lead.update({
+					where: { id: target.leadId },
+					data: { lastActivityAt: now },
+				});
+			}
 
 			await tx.agentAction.update({
 				where: { id: claim.actionId },
@@ -368,6 +386,113 @@ export async function createRunActivity(
 		});
 
 		return { actionId: claim.actionId, activityId, replayed: false };
+	} catch (error) {
+		const message = error instanceof Error ? error.message : String(error);
+		await failRunAction(claim, "ACTION_REJECTED", message);
+		throw error;
+	}
+}
+
+export async function sendRunLeadMessage(
+	runId: string,
+	callId: string,
+	input: { leadId: string; templateId: string },
+) {
+	const run = await db.agentRun.findUnique({
+		where: { id: runId },
+		select: {
+			id: true,
+			status: true,
+			agentId: true,
+			initiatedById: true,
+			agent: { select: { createdById: true } },
+			version: { select: { manifest: true } },
+		},
+	});
+	if (!run) throw new Error("This agent run is unavailable.");
+	if (run.status !== "RUNNING")
+		throw new Error("This agent run is not active.");
+	const template = approvedLeadTemplate(run.version.manifest, input.templateId);
+	const scope = manifestDataScope(run.version.manifest);
+	assertResourceAllowed(scope.mode, scope.resources, {
+		kind: "lead",
+		id: input.leadId,
+	});
+	const lead = await db.lead.findUnique({
+		where: { id: input.leadId },
+		select: { id: true, name: true },
+	});
+	if (!lead) throw new Error("The requested lead no longer exists.");
+	const idempotencyKey = `${runId}:${callId}`;
+	const requestHash = hashRequest({
+		leadId: input.leadId,
+		templateId: template.id,
+	});
+	const existing = await findRunAction(idempotencyKey, requestHash);
+	if (existing?.status === "SUCCEEDED") {
+		return {
+			actionId: existing.id,
+			messageId: existing.externalId,
+			replayed: true,
+		};
+	}
+	const claim = await claimRunAction(existing, idempotencyKey, requestHash, {
+		agentId: run.agentId,
+		runId,
+		type: AGENT_ACTION_TYPES.LEAD_MESSAGE_SEND,
+		provider: template.channel === "EMAIL" ? "email" : "whatsapp",
+		targetType: "lead",
+		targetId: lead.id,
+		targetLabel: lead.name,
+		summary: `Send ${template.name} to ${lead.name}`,
+		metadata: { templateId: template.id, templateName: template.name },
+	});
+	if (!claim.claimed) {
+		return {
+			actionId: claim.actionId,
+			messageId: claim.externalId,
+			replayed: true,
+		};
+	}
+
+	try {
+		const secret = process.env.AGENT_BRIDGE_SECRET?.trim();
+		if (!secret) throw new Error("The agent bridge secret is not configured.");
+		const base = process.env.API_URL?.trim() || "http://127.0.0.1:3001";
+		const response = await fetch(
+			new URL("/internal/communications/agent", base),
+			{
+				method: "POST",
+				headers: {
+					authorization: `Bearer ${secret}`,
+					"content-type": "application/json",
+				},
+				body: JSON.stringify({
+					userId: run.initiatedById ?? run.agent.createdById,
+					leadId: lead.id,
+					template,
+				}),
+				signal: AbortSignal.timeout(20_000),
+			},
+		);
+		const result = (await response.json().catch(() => null)) as {
+			messageId?: string | null;
+			message?: string;
+		} | null;
+		if (!response.ok)
+			throw new Error(
+				result?.message ?? `Communication API returned ${response.status}.`,
+			);
+		const messageId = result?.messageId ?? null;
+		await db.agentAction.update({
+			where: { id: claim.actionId },
+			data: {
+				status: "SUCCEEDED",
+				externalId: messageId,
+				completedAt: new Date(),
+			},
+		});
+		return { actionId: claim.actionId, messageId, replayed: false };
 	} catch (error) {
 		const message = error instanceof Error ? error.message : String(error);
 		await failRunAction(claim, "ACTION_REJECTED", message);
@@ -911,7 +1036,11 @@ async function requiredActionFailure(
 					runId: run.id,
 					type,
 					provider:
-						type === AGENT_ACTION_TYPES.SLACK_MESSAGE_POST ? "slack" : "crm",
+						type === AGENT_ACTION_TYPES.SLACK_MESSAGE_POST
+							? "slack"
+							: type === AGENT_ACTION_TYPES.LEAD_MESSAGE_SEND
+								? "communications"
+								: "crm",
 					summary: action.summary,
 					status: "FAILED",
 					idempotencyKey: `run:${run.id}:required:${type}`,
@@ -1055,10 +1184,28 @@ export function approvedSlackDestination(
 	return destination;
 }
 
+function approvedLeadTemplate(
+	manifest: Prisma.JsonValue,
+	templateId: string,
+): PinnedLeadTemplate {
+	const templates = manifestActions(manifest).flatMap((action) =>
+		action.type === AGENT_ACTION_TYPES.LEAD_MESSAGE_SEND
+			? action.templates
+			: [],
+	);
+	const template = templates.find((item) => item.id === templateId);
+	if (!template) {
+		throw new Error(
+			"That message template is not approved for this agent version.",
+		);
+	}
+	return template;
+}
+
 function assertResourceAllowed(
 	mode: RunRecordScope,
 	resources: AgentManifestResource[],
-	input: { kind: "contact" | "company" | "deal"; id: string },
+	input: { kind: "contact" | "company" | "deal" | "lead"; id: string },
 ) {
 	if (mode === "WORKSPACE") return;
 	const records = resources.filter(
@@ -1090,7 +1237,71 @@ export function allowedHistorySources(
 	};
 }
 
-async function targetRecord(kind: "company" | "contact" | "deal", id: string) {
+async function readLead(id: string) {
+	const lead = await db.lead.findUnique({
+		where: { id },
+		select: {
+			id: true,
+			name: true,
+			companyName: true,
+			email: true,
+			phone: true,
+			kind: true,
+			entity: true,
+			stage: true,
+			source: true,
+			country: true,
+			notes: true,
+			createdAt: true,
+			lastActivityAt: true,
+			owner: { select: { id: true, name: true, email: true } },
+			activities: {
+				orderBy: [{ occurredAt: "desc" }, { createdAt: "desc" }],
+				take: 20,
+				select: {
+					id: true,
+					type: true,
+					subject: true,
+					body: true,
+					occurredAt: true,
+					createdAt: true,
+					createdBy: { select: { name: true } },
+				},
+			},
+		},
+	});
+	if (!lead) throw new Error("The requested lead no longer exists.");
+	return {
+		...lead,
+		createdAt: lead.createdAt.toISOString(),
+		lastActivityAt: lead.lastActivityAt?.toISOString() ?? null,
+		activities: lead.activities.map((activity) => ({
+			...activity,
+			createdAt: activity.createdAt.toISOString(),
+			occurredAt: (activity.occurredAt ?? activity.createdAt).toISOString(),
+		})),
+	};
+}
+
+async function targetRecord(
+	kind: "company" | "contact" | "deal" | "lead",
+	id: string,
+) {
+	if (kind === "lead") {
+		const lead = await db.lead.findUnique({
+			where: { id },
+			select: { id: true, name: true },
+		});
+		return lead
+			? {
+					label: lead.name,
+					companyId: null,
+					contactId: null,
+					dealId: null,
+					leadId: lead.id,
+				}
+			: null;
+	}
 	if (kind === "company") {
 		const company = await db.company.findUnique({
 			where: { id },
@@ -1102,6 +1313,7 @@ async function targetRecord(kind: "company" | "contact" | "deal", id: string) {
 					companyId: company.id,
 					contactId: null,
 					dealId: null,
+					leadId: null,
 				}
 			: null;
 	}
@@ -1118,6 +1330,7 @@ async function targetRecord(kind: "company" | "contact" | "deal", id: string) {
 					companyId: contact.companyId,
 					contactId: contact.id,
 					dealId: null,
+					leadId: null,
 				}
 			: null;
 	}
@@ -1132,13 +1345,14 @@ async function targetRecord(kind: "company" | "contact" | "deal", id: string) {
 				companyId: deal.companyId,
 				contactId: null,
 				dealId: deal.id,
+				leadId: null,
 			}
 		: null;
 }
 
 function actionRequestHash(input: {
 	type: "NOTE" | "TASK";
-	targetKind: "company" | "contact" | "deal";
+	targetKind: "company" | "contact" | "deal" | "lead";
 	targetId: string;
 	subject?: string | null;
 	body?: string | null;

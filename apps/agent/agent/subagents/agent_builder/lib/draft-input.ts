@@ -4,7 +4,7 @@ import { z } from "zod";
 import type { DraftAgentInput } from "../../../lib/builder-runtime";
 
 const recordResource = z.object({
-	kind: z.enum(["company", "contact", "deal"]),
+	kind: z.enum(["company", "contact", "deal", "lead"]),
 	id: z.string().min(1),
 	label: z.string().min(1).max(120),
 });
@@ -55,6 +55,25 @@ const action = z.discriminatedUnion("type", [
 			label: z.string().trim().min(1).max(120),
 		}),
 	}),
+	z.object({
+		type: z.literal(AGENT_ACTION_TYPES.LEAD_MESSAGE_SEND),
+		provider: z.literal("communications"),
+		summary: z.string().trim().min(1).max(240),
+		templates: z
+			.array(
+				z.object({
+					id: z.string().min(1),
+					name: z.string().min(1),
+					channel: z.enum(["EMAIL", "WHATSAPP"]),
+					subject: z.string().nullable(),
+					body: z.string(),
+					providerTemplateName: z.string().nullable(),
+					language: z.string(),
+				}),
+			)
+			.min(1)
+			.max(10),
+	}),
 ]);
 
 export const builderDraftToolInput = z.object({
@@ -64,7 +83,9 @@ export const builderDraftToolInput = z.object({
 	triggers: z.array(trigger).min(1).max(10),
 	recordScope: z.enum(["SELECTED", "WORKSPACE"]),
 	resources: z.array(recordResource).max(30),
-	integrations: z.array(z.enum(["gmail", "calendar", "slack"])).max(3),
+	integrations: z
+		.array(z.enum(["gmail", "calendar", "slack", "email", "whatsapp"]))
+		.max(5),
 	actions: z.array(action).min(1).max(10),
 });
 
@@ -85,6 +106,16 @@ const INTEGRATIONS = {
 		label: "Google Calendar",
 	},
 	slack: { kind: "integration", id: "slack:workspace", label: "Slack" },
+	email: {
+		kind: "integration",
+		id: "communications:email",
+		label: "Email sending",
+	},
+	whatsapp: {
+		kind: "integration",
+		id: "communications:whatsapp",
+		label: "WhatsApp Cloud API",
+	},
 } as const;
 
 export function draftInputFromTool(
@@ -104,6 +135,10 @@ export function draftInputFromTool(
 			? "Read workspace CRM records"
 			: "Read selected CRM records",
 		...integrations.map((integration) => {
+			if (integration === "email")
+				return "Send approved email templates to leads";
+			if (integration === "whatsapp")
+				return "Send approved WhatsApp templates to leads";
 			if (integration === "gmail") return "Read connected Gmail messages";
 			if (integration === "calendar") {
 				return "Read connected Google Calendar events";

@@ -5,6 +5,7 @@ export const AGENT_ACTION_TYPES = {
 	CRM_ACTIVITY_CREATE: "crm.activity.create",
 	RUN_SUMMARY: "run.summary",
 	SLACK_MESSAGE_POST: "slack.message.post",
+	LEAD_MESSAGE_SEND: "lead.message.send",
 } as const;
 
 export type AgentActionType =
@@ -21,6 +22,16 @@ const slackDestination = z.object({
 	resolution: z.literal("chosen"),
 	id: z.string().trim().min(1).max(120),
 	label: z.string().trim().min(1).max(120),
+});
+
+export const pinnedMessageTemplate = z.object({
+	id: z.string().min(1),
+	name: z.string().min(1),
+	channel: z.enum(["EMAIL", "WHATSAPP"]),
+	subject: z.string().nullable(),
+	body: z.string(),
+	providerTemplateName: z.string().nullable(),
+	language: z.string(),
 });
 
 export const agentManifestAction = z.discriminatedUnion("type", [
@@ -43,6 +54,12 @@ export const agentManifestAction = z.discriminatedUnion("type", [
 		provider: z.literal("slack"),
 		summary: z.string(),
 		destination: slackDestination,
+	}),
+	z.object({
+		type: z.literal(AGENT_ACTION_TYPES.LEAD_MESSAGE_SEND),
+		provider: z.literal("communications"),
+		summary: z.string(),
+		templates: z.array(pinnedMessageTemplate).min(1).max(10),
 	}),
 ]);
 
@@ -78,7 +95,7 @@ export const agentManifestTrigger = z.discriminatedUnion("type", [
 
 export const agentManifestResource = z.object({
 	id: z.string(),
-	kind: z.enum(["company", "contact", "deal", "integration"]),
+	kind: z.enum(["company", "contact", "deal", "lead", "integration"]),
 	label: z.string(),
 });
 

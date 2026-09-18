@@ -14,16 +14,18 @@ import { requestStaleSlackInventorySync } from "./slack-people";
 
 const GMAIL_SCOPE = "https://www.googleapis.com/auth/gmail.readonly";
 const CALENDAR_SCOPE = "https://www.googleapis.com/auth/calendar.readonly";
+const GMAIL_SEND_SCOPE = "https://www.googleapis.com/auth/gmail.send";
+const OUTLOOK_SEND_SCOPE = "Mail.Send";
 
 export type BuilderResource = {
-	kind: "integration" | "company" | "contact" | "deal";
+	kind: "integration" | "company" | "contact" | "deal" | "lead";
 	id: string;
 	label: string;
 };
 
 const taggedResource = z
 	.object({
-		kind: z.enum(["integration", "company", "contact", "deal"]),
+		kind: z.enum(["integration", "company", "contact", "deal", "lead"]),
 		id: z.string(),
 		label: z.string(),
 	})
@@ -65,6 +67,20 @@ export type DraftAction =
 				id: string;
 				label: string;
 			};
+	  }
+	| {
+			type: typeof AGENT_ACTION_TYPES.LEAD_MESSAGE_SEND;
+			provider: "communications";
+			summary: string;
+			templates: Array<{
+				id: string;
+				name: string;
+				channel: "EMAIL" | "WHATSAPP";
+				subject: string | null;
+				body: string;
+				providerTemplateName: string | null;
+				language: string;
+			}>;
 	  };
 
 export type DraftAgentInput = {
@@ -187,6 +203,19 @@ export async function builderContext(conversationId: string, userId: string) {
 			title: conversation.title,
 		},
 		availableConnections: await connectionStatus(userId),
+		messageTemplates: await db.messageTemplate.findMany({
+			where: { active: true, channel: { in: ["EMAIL", "WHATSAPP"] } },
+			select: {
+				id: true,
+				name: true,
+				channel: true,
+				subject: true,
+				body: true,
+				providerTemplateName: true,
+				language: true,
+			},
+			orderBy: [{ channel: "asc" }, { name: "asc" }],
+		}),
 		crmEvents: CRM_EVENT_TYPES.map((type) => ({
 			type,
 			...CRM_EVENT_CATALOG[type],
@@ -528,23 +557,7 @@ async function validateDraft(
 		resourceKeys.add(key);
 
 		if (resource.kind !== "integration") continue;
-		if (resource.id === "google:gmail" && !connections.gmail) {
-			issues.push("Gmail is not connected for the chat owner.");
-		}
-		if (resource.id === "google:calendar" && !connections.calendar) {
-			issues.push("Google Calendar is not connected for the chat owner.");
-		}
-		if (resource.id === "slack:workspace" && !connections.slack) {
-			issues.push("Slack is not connected for this workspace.");
-		}
-		if (
-			!["google:gmail", "google:calendar", "slack:workspace"].includes(
-				resource.id,
-			)
-		) {
-			issues.push(`${resource.label} is not an available integration.`);
-			continue;
-		}
+		issues.push(...integrationResourceIssues(resource, connections));
 		capabilities.add(`${resource.id}.read`);
 	}
 
@@ -557,6 +570,9 @@ async function validateDraft(
 		capabilities.add(action.type);
 		if (action.type === AGENT_ACTION_TYPES.SLACK_MESSAGE_POST) {
 			issues.push(...slackDestinationIssues(action.destination, connections));
+		}
+		if (action.type === AGENT_ACTION_TYPES.LEAD_MESSAGE_SEND) {
+			issues.push(...(await messageTemplateIssues(action)));
 		}
 		if (action.type !== AGENT_ACTION_TYPES.CRM_ACTIVITY_CREATE) continue;
 		if (new Set(action.activityTypes).size !== action.activityTypes.length) {
@@ -623,9 +639,9 @@ async function validateDraft(
 }
 
 async function connectionStatus(userId: string) {
-	const [googleAccounts, slackAccount, workspaceMembers] = await Promise.all([
+	const [accounts, slackAccount, workspaceMembers] = await Promise.all([
 		db.account.findMany({
-			where: { userId, providerId: "google" },
+			where: { userId, providerId: { in: ["google", "microsoft"] } },
 			select: { providerId: true, scope: true },
 		}),
 		db.account.findFirst({
@@ -662,7 +678,7 @@ async function connectionStatus(userId: string) {
 		select: { id: true, name: true, memberCount: true },
 	});
 	const scopes = new Set(
-		googleAccounts.flatMap((account) => (account.scope ?? "").split(/[,\s]+/)),
+		accounts.flatMap((account) => (account.scope ?? "").split(/[,\s]+/)),
 	);
 	const slackPeople = workspaceMembers.flatMap(({ user }) => {
 		const match = user.slackMemberMatch;
@@ -682,6 +698,11 @@ async function connectionStatus(userId: string) {
 	return {
 		gmail: scopes.has(GMAIL_SCOPE),
 		calendar: scopes.has(CALENDAR_SCOPE),
+		email: scopes.has(GMAIL_SEND_SCOPE) || scopes.has(OUTLOOK_SEND_SCOPE),
+		whatsapp: Boolean(
+			process.env.WHATSAPP_ACCESS_TOKEN?.trim() &&
+				process.env.WHATSAPP_PHONE_NUMBER_ID?.trim(),
+		),
 		slack: Boolean(slackAccount),
 		slackChannels: slackChannels.map((channel) => ({
 			id: channel.id,
@@ -695,6 +716,67 @@ async function connectionStatus(userId: string) {
 
 type SlackConnections = Awaited<ReturnType<typeof connectionStatus>>;
 
+function integrationResourceIssues(
+	resource: BuilderResource,
+	connections: SlackConnections,
+): string[] {
+	const supported = new Set([
+		"google:gmail",
+		"google:calendar",
+		"slack:workspace",
+		"communications:email",
+		"communications:whatsapp",
+	]);
+	if (!supported.has(resource.id)) {
+		return [`${resource.label} is not an available integration.`];
+	}
+	if (resource.id === "google:gmail" && !connections.gmail) {
+		return ["Gmail is not connected for the chat owner."];
+	}
+	if (resource.id === "google:calendar" && !connections.calendar) {
+		return ["Google Calendar is not connected for the chat owner."];
+	}
+	if (resource.id === "slack:workspace" && !connections.slack) {
+		return ["Slack is not connected for this workspace."];
+	}
+	if (resource.id === "communications:email" && !connections.email) {
+		return ["Email sending is not connected for the chat owner."];
+	}
+	if (resource.id === "communications:whatsapp" && !connections.whatsapp) {
+		return ["WhatsApp Cloud API is not configured."];
+	}
+	return [];
+}
+
+async function messageTemplateIssues(
+	action: Extract<
+		DraftAction,
+		{ type: typeof AGENT_ACTION_TYPES.LEAD_MESSAGE_SEND }
+	>,
+): Promise<string[]> {
+	const templates = await db.messageTemplate.findMany({
+		where: {
+			id: { in: action.templates.map((template) => template.id) },
+			active: true,
+		},
+		select: {
+			id: true,
+			name: true,
+			channel: true,
+			subject: true,
+			body: true,
+			providerTemplateName: true,
+			language: true,
+		},
+	});
+	return action.templates.flatMap((template) => {
+		const current = templates.find((item) => item.id === template.id);
+		return current && isDeepStrictEqual(current, template)
+			? []
+			: [`${template.name} is not an active unchanged message template.`];
+	});
+}
+
 export function actionIntegrationIssues(
 	actions: DraftAction[],
 	resources: BuilderResource[],
@@ -706,6 +788,24 @@ export function actionIntegrationIssues(
 	);
 
 	return actions.flatMap((action) => {
+		if (action.type === AGENT_ACTION_TYPES.LEAD_MESSAGE_SEND) {
+			const needed = new Set(
+				action.templates.map((template) =>
+					template.channel === "EMAIL"
+						? "communications:email"
+						: "communications:whatsapp",
+				),
+			);
+			return [...needed].flatMap((resourceId) =>
+				integrations.has(resourceId)
+					? []
+					: [
+							resourceId === "communications:email"
+								? "Sending email needs Email sending in this agent's integrations."
+								: "Sending WhatsApp needs WhatsApp Cloud API in this agent's integrations.",
+						],
+			);
+		}
 		const dependency = actionDependency(action.type);
 		if (!dependency || integrations.has(dependency.resourceId)) return [];
 		return [
@@ -779,6 +879,21 @@ async function describeResources(resources: BuilderResource[]) {
 							}
 						: null,
 				};
+			}
+			if (resource.kind === "lead") {
+				const row = await db.lead.findUnique({
+					where: { id: resource.id },
+					select: {
+						id: true,
+						name: true,
+						companyName: true,
+						email: true,
+						phone: true,
+						stage: true,
+						source: true,
+					},
+				});
+				return { ...resource, record: row };
 			}
 			return { ...resource, record: null };
 		}),

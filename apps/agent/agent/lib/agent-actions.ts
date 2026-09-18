@@ -7,6 +7,7 @@ export const AGENT_ACTION_EXECUTORS = {
 	[AGENT_ACTION_TYPES.CRM_ACTIVITY_CREATE]: "create_crm_activity",
 	[AGENT_ACTION_TYPES.RUN_SUMMARY]: "finish_run",
 	[AGENT_ACTION_TYPES.SLACK_MESSAGE_POST]: "post_slack_message",
+	[AGENT_ACTION_TYPES.LEAD_MESSAGE_SEND]: "send_lead_message",
 } as const satisfies Record<AgentActionType, string>;
 
 export function isAgentActionType(value: string): value is AgentActionType {
@@ -31,6 +32,7 @@ export const AGENT_ACTION_DEPENDENCIES = {
 		resourceId: "slack:workspace",
 		fix: "Connect Slack in Settings → Connections.",
 	},
+	[AGENT_ACTION_TYPES.LEAD_MESSAGE_SEND]: null,
 } as const satisfies Record<AgentActionType, AgentActionDependency | null>;
 
 export function actionDependency(

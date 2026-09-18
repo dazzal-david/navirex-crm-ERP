@@ -312,11 +312,13 @@ export async function queueEventAgentRuns(
 	const recordId = parsed.data.record.id;
 	const occurredAtDate = new Date(occurredAt);
 	const taskRecordId =
-		recordKind === "contact"
-			? task.contactId
-			: recordKind === "company"
-				? task.companyId
-				: task.dealId;
+		recordKind === "lead"
+			? recordId
+			: recordKind === "contact"
+				? task.contactId
+				: recordKind === "company"
+					? task.companyId
+					: task.dealId;
 	if (taskRecordId !== recordId) {
 		throw new Error("The queued agent event is invalid.");
 	}

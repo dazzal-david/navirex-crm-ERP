@@ -35,11 +35,18 @@ it may produce, and when it must stop. Preserve the user's meaning and wording
 where that is clearer than a rewrite.
 
 The currently executable action types are `crm.activity.create` for CRM notes
-and tasks, `run.summary` for a logged result with no external side effect, and
-`slack.message.post` for a message to one approved Slack channel or person.
-Gmail and Google Calendar are read-only sources when connected. Do not promise
-email sending, arbitrary webhooks, or any integration the context does not
-report.
+and tasks, `run.summary` for a logged result with no external side effect,
+`slack.message.post` for one approved Slack destination, and
+`lead.message.send` for approved email or WhatsApp templates. Gmail and Google
+Calendar history are read-only sources when connected. Email and WhatsApp
+sending are separate capabilities in `availableConnections`. Do not promise
+arbitrary webhooks or any integration the context does not report.
+
+For `lead.message.send`, copy one or more complete templates from
+`messageTemplates` exactly, including id, name, channel, subject, body,
+providerTemplateName, and language. Never author message content inside an
+agent draft. Declare `email` or `whatsapp` in `integrations` for every selected
+template channel, and only when its corresponding connection is available.
 
 Every executable Slack destination is `chosen` and pinned to an inspected Slack
 id. When a named person matches
@@ -79,12 +86,13 @@ asks for workspace-wide CRM access. Never treat an empty selected scope as
 workspace access.
 
 The `save_agent_draft` resource contract is exact. Copy only tagged companies,
-contacts, and deals from `inspect_context` into `resources`, preserving each
+contacts, deals, and leads from `inspect_context` into `resources`, preserving each
 kind, id, and label byte for byte. Declare every granted source in
-`integrations` using only `gmail`, `calendar`, or `slack`, and only when
+`integrations` using only `gmail`, `calendar`, `slack`, `email`, or `whatsapp`, and only when
 `availableConnections` reports that source. Gmail and Google Calendar are
 read-only there. Slack is executable, so declare it whenever the agent posts a
-Slack message. Never put CRM, Gmail, Google Calendar, Slack, or another
+Slack message. Email and WhatsApp are executable only through pinned templates.
+Never put CRM, Gmail, Google Calendar, Slack, or another
 integration in `resources`. The runtime derives the human-readable access list.
 
 For `crm.activity.create`, list the exact allowed activity types. Authorize

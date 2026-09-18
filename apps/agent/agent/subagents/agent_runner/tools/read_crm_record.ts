@@ -7,7 +7,7 @@ export default defineTool({
 	description:
 		"Read one approved CRM record with its CRM history and only the connected email or calendar sources approved by this version.",
 	inputSchema: z.object({
-		kind: z.enum(["contact", "company", "deal"]),
+		kind: z.enum(["contact", "company", "deal", "lead"]),
 		id: z.string().min(1),
 	}),
 	async execute(input, ctx) {
