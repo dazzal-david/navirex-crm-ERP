@@ -73,6 +73,10 @@ application permission `Mail.Send` and tenant administrator consent. No employee
 OAuth connection or redirect URI participates in this path. The CRM still records
 the employee who initiated each message for its audit history.
 
+The Entra `Mail.Send` application permission is tenant-wide by default. Restrict
+the service principal to the shared mailbox with Exchange Online Application RBAC
+so leaked credentials cannot send as another mailbox.
+
 ## Direction is the organising idea
 
 Every connection declares what it **brings in** and what it **sends**. Use those
