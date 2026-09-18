@@ -272,11 +272,13 @@ export function CommunicationsInbox() {
 								<p className="text-muted-foreground text-xs">
 									{channel === "note"
 										? "Visible only to your team"
-										: channel === "email" && !canSend
-											? "Connect email sending if unavailable"
-											: channel === "whatsapp" && !canSend
-												? "Configure WhatsApp if unavailable"
-												: `Send via ${channelLabel(channel)}`}
+										: channel === "email" && status.data?.email.sender
+											? `Send from ${status.data.email.sender}`
+											: channel === "email" && !canSend
+												? "Connect email sending if unavailable"
+												: channel === "whatsapp" && !canSend
+													? "Configure WhatsApp if unavailable"
+													: `Send via ${channelLabel(channel)}`}
 								</p>
 								<Button
 									disabled={!canSend || pending}

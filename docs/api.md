@@ -165,6 +165,12 @@ Two rules follow for the serverless build:
 
 ## Two mail providers, one pipeline
 
+Outbound Microsoft mail can use one workspace sender through application-only
+Graph credentials. `GraphMailService` owns token caching and sends through
+`/users/{sender}/sendMail`. `CommunicationsService` prefers this configured sender
+over personal delegated providers while retaining the acting CRM user in activity
+history. The four `MAIL_GRAPH_*` values must never reach the browser.
+
 `apps/api/src/mailbox` is everything neither Google nor Microsoft owns:
 `MailboxApiClient` (bearer GET, and the one place a status code becomes an outcome),
 `SyncStateService` (the `MailboxSync` row), `MailboxTokenService`,

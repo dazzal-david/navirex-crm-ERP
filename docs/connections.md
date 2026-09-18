@@ -60,6 +60,19 @@ sign in on different paths and never reach the guard.
 A workspace with no owner and no admin lets any member connect. There is nobody
 left to ask, and a fresh install must not be locked out of its first connection.
 
+## Shared Microsoft Graph sender
+
+`MAIL_GRAPH_TENANT_ID`, `MAIL_GRAPH_CLIENT_ID`, `MAIL_GRAPH_CLIENT_SECRET`, and
+`MAIL_GRAPH_SENDER` enable application-only outbound email. The API requests a
+Graph token with the client credentials grant and the
+`https://graph.microsoft.com/.default` scope, then sends through
+`/users/{sender}/sendMail`.
+
+All four variables are required together. The Entra application needs the
+application permission `Mail.Send` and tenant administrator consent. No employee
+OAuth connection or redirect URI participates in this path. The CRM still records
+the employee who initiated each message for its audit history.
+
 ## Direction is the organising idea
 
 Every connection declares what it **brings in** and what it **sends**. Use those

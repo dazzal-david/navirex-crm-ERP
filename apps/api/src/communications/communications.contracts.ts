@@ -4,6 +4,7 @@ export const communicationStatusOutput = z.object({
 	email: z.object({
 		google: z.boolean(),
 		microsoft: z.boolean(),
+		sender: z.string().nullable(),
 	}),
 	whatsapp: z.boolean(),
 });

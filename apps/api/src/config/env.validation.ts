@@ -1,5 +1,6 @@
 import { plainToInstance, Type } from "class-transformer";
 import {
+	IsEmail,
 	IsEnum,
 	IsInt,
 	IsOptional,
@@ -67,6 +68,22 @@ export class EnvironmentVariables {
 	@IsOptional()
 	@IsString()
 	MICROSOFT_TENANT_ID?: string;
+
+	@IsOptional()
+	@IsString()
+	MAIL_GRAPH_TENANT_ID?: string;
+
+	@IsOptional()
+	@IsString()
+	MAIL_GRAPH_CLIENT_ID?: string;
+
+	@IsOptional()
+	@IsString()
+	MAIL_GRAPH_CLIENT_SECRET?: string;
+
+	@IsOptional()
+	@IsEmail()
+	MAIL_GRAPH_SENDER?: string;
 
 	@IsOptional()
 	@IsString()
@@ -182,6 +199,19 @@ export function validateEnv(config: RawEnvironment): EnvironmentVariables {
 
 		throw new Error(
 			`Invalid environment configuration:\n  - ${details}\n\nSee .env.example at the root of the repo.`,
+		);
+	}
+
+	const graphMail = [
+		validated.MAIL_GRAPH_TENANT_ID,
+		validated.MAIL_GRAPH_CLIENT_ID,
+		validated.MAIL_GRAPH_CLIENT_SECRET,
+		validated.MAIL_GRAPH_SENDER,
+	];
+	const graphMailValues = graphMail.filter(Boolean).length;
+	if (graphMailValues > 0 && graphMailValues < graphMail.length) {
+		throw new Error(
+			"MAIL_GRAPH_TENANT_ID, MAIL_GRAPH_CLIENT_ID, MAIL_GRAPH_CLIENT_SECRET, and MAIL_GRAPH_SENDER must be set together.",
 		);
 	}
 

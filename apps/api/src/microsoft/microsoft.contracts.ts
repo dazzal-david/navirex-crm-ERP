@@ -29,6 +29,8 @@ export const microsoftConnectionStatusOutput = z.object({
 	linked: z.boolean(),
 	required: z.boolean(),
 	hasRefreshToken: z.boolean(),
+	shared: z.boolean(),
+	sender: z.string().nullable(),
 	sources: z.array(microsoftSourceStatusOutput),
 });
 

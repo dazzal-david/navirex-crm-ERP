@@ -49,6 +49,14 @@ Entra app uses the API callback
 `Mail.Read` and `Mail.Send` permissions. Each employee connects their own mailbox
 from Settings → Connections → Microsoft 365.
 
+**`MAIL_GRAPH_TENANT_ID` + `MAIL_GRAPH_CLIENT_ID` +
+`MAIL_GRAPH_CLIENT_SECRET` + `MAIL_GRAPH_SENDER`** configure one shared outbound
+mailbox. Set all four on `navirex-crm-api`. This mode uses client credentials,
+requires the Microsoft Graph **application** permission `Mail.Send` with admin
+consent, and calls `/users/{MAIL_GRAPH_SENDER}/sendMail`. It needs no redirect URI
+and no employee mailbox connection. When configured, it takes priority over each
+user's delegated Google or Microsoft sender.
+
 **Neither pair is required, but an install wants one of them or an SSO provider** —
 with none, the sign-in page says so by name rather than rendering nothing.
 

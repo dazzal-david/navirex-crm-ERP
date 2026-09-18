@@ -131,8 +131,12 @@ async function ConnectionsSettingsPageContent({
 			? [
 					{
 						name: "Microsoft 365",
-						status: "Connected",
-						bringsIn: "Outlook email and the people on it",
+						status: microsoft.shared
+							? `Shared sender: ${microsoft.sender}`
+							: "Connected",
+						bringsIn: microsoft.shared
+							? "Server-managed Microsoft Graph mail"
+							: "Outlook email and the people on it",
 						sends: communications.email.microsoft
 							? "Outbound lead emails"
 							: "Reconnect to enable sending",

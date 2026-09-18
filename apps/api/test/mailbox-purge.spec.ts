@@ -11,6 +11,7 @@ import {
 import type { MailboxMatchService } from "../src/mailbox/mailbox-match.service";
 import { MailboxTokenService } from "../src/mailbox/mailbox-token.service";
 import { SyncStateService } from "../src/mailbox/sync-state.service";
+import type { GraphMailService } from "../src/microsoft/graph-mail.service";
 import { MicrosoftConnectionService } from "../src/microsoft/microsoft-connection.service";
 
 const suffix = process.env.TEST_RUN_ID ?? "mailbox-purge-spec";
@@ -37,7 +38,13 @@ const google = new GoogleConnectionService(
 	{} as unknown as MailboxMatchService,
 	stamp,
 );
-const microsoft = new MicrosoftConnectionService(db, tokens, state, stamp);
+const microsoft = new MicrosoftConnectionService(
+	db,
+	tokens,
+	state,
+	stamp,
+	{} as GraphMailService,
+);
 
 function at(hour: number): Date {
 	return new Date(Date.UTC(2026, 0, 1, hour));

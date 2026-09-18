@@ -5,6 +5,7 @@ import { ActivityStampService } from "../crm/activity-stamp.service";
 import { InjectDatabase } from "../database/database.constants";
 import { MailboxTokenService } from "../mailbox/mailbox-token.service";
 import { SyncStateService } from "../mailbox/sync-state.service";
+import { GraphMailService } from "./graph-mail.service";
 import {
 	MICROSOFT_PROVIDER_ID,
 	MICROSOFT_SYNC_SOURCES,
@@ -29,9 +30,22 @@ export class MicrosoftConnectionService {
 		private readonly tokens: MailboxTokenService,
 		private readonly state: SyncStateService,
 		private readonly stamp: ActivityStampService,
+		private readonly graphMail: GraphMailService,
 	) {}
 
 	async status(userId: string): Promise<MicrosoftConnectionStatus> {
+		if (this.graphMail.configured) {
+			return {
+				configured: true,
+				linked: true,
+				required: false,
+				hasRefreshToken: true,
+				shared: true,
+				sender: this.graphMail.sender,
+				sources: [],
+			};
+		}
+
 		await this.onConnected(userId);
 
 		const [granted, rows, hasRefreshToken, accounts] = await Promise.all([
@@ -66,6 +80,8 @@ export class MicrosoftConnectionService {
 				) && sources.some((source) => source.connected),
 			required: signsInWithMicrosoft(accounts),
 			hasRefreshToken,
+			shared: false,
+			sender: null,
 			sources,
 		};
 	}

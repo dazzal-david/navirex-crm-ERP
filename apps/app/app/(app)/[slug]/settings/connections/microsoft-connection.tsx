@@ -146,6 +146,32 @@ function ConnectMicrosoft({
 	);
 }
 
+function SharedMicrosoft({ sender }: { sender: string }) {
+	return (
+		<Card>
+			<CardHeader>
+				<CardTitle>
+					<div className="flex items-center gap-2">
+						Microsoft Graph
+						<StatusIndicator size="sm" tone="success" label="Ready" />
+					</div>
+				</CardTitle>
+				<CardDescription>
+					Shared outbound email is available to every CRM member.
+				</CardDescription>
+			</CardHeader>
+			<CardContent className="flex flex-col gap-1 text-sm">
+				<p className="text-muted-foreground text-xs">Sender</p>
+				<p className="font-medium">{sender}</p>
+				<p className="pt-3 text-muted-foreground text-xs">
+					The API authenticates directly with Microsoft. Employees do not need
+					to connect personal Microsoft accounts.
+				</p>
+			</CardContent>
+		</Card>
+	);
+}
+
 export function MicrosoftConnection({
 	slug,
 	connectError,
@@ -200,9 +226,17 @@ export function MicrosoftConnection({
 
 	if (!status.data) return null;
 
-	const { sources, hasRefreshToken, configured, linked, required } =
-		status.data;
+	const {
+		sources,
+		hasRefreshToken,
+		configured,
+		linked,
+		required,
+		shared,
+		sender,
+	} = status.data;
 
+	if (shared && sender) return <SharedMicrosoft sender={sender} />;
 	if (!configured) return <MicrosoftUnavailable />;
 	if (!linked) {
 		return <ConnectMicrosoft slug={slug} connectError={connectError} />;

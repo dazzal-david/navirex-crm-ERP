@@ -16,6 +16,7 @@ import { z } from "zod";
 import type { EnvironmentVariables } from "../config/env.validation";
 import { InjectDatabase } from "../database/database.constants";
 import { MailboxTokenService } from "../mailbox/mailbox-token.service";
+import { GraphMailService } from "../microsoft/graph-mail.service";
 
 const communicationMetaValue = z.object({
 	channel: z.string().optional(),
@@ -40,6 +41,7 @@ export class CommunicationsService {
 	constructor(
 		@InjectDatabase() private readonly db: Db,
 		private readonly tokens: MailboxTokenService,
+		private readonly graphMail: GraphMailService,
 		config: ConfigService<EnvironmentVariables, true>,
 	) {
 		this.whatsappToken = config.get("WHATSAPP_ACCESS_TOKEN", { infer: true });
@@ -65,7 +67,10 @@ export class CommunicationsService {
 		return {
 			email: {
 				google: granted(GOOGLE_PROVIDER_ID, GMAIL_SEND_SCOPE),
-				microsoft: granted(MICROSOFT_PROVIDER_ID, OUTLOOK_SEND_SCOPE),
+				microsoft:
+					this.graphMail.configured ||
+					granted(MICROSOFT_PROVIDER_ID, OUTLOOK_SEND_SCOPE),
+				sender: this.graphMail.sender,
 			},
 			whatsapp: Boolean(this.whatsappToken && this.whatsappPhoneId),
 		};
@@ -273,7 +278,15 @@ export class CommunicationsService {
 		const status = await this.status(userId);
 		let provider: string;
 		let messageId: string | null;
-		if (status.email.google) {
+		if (this.graphMail.configured) {
+			provider = "microsoft";
+			messageId = await this.sendMicrosoft(
+				userId,
+				lead.email,
+				input.subject,
+				input.body,
+			);
+		} else if (status.email.google) {
 			provider = "google";
 			messageId = await this.sendGoogle(
 				userId,
@@ -305,6 +318,7 @@ export class CommunicationsService {
 				channel: "email",
 				provider,
 				messageId,
+				from: this.graphMail.sender,
 				to: lead.email,
 			},
 		);
@@ -457,6 +471,10 @@ export class CommunicationsService {
 		subject: string,
 		body: string,
 	) {
+		if (this.graphMail.configured) {
+			await this.graphMail.send(to, subject, body);
+			return null;
+		}
 		const token = await this.tokens.accessTokenFor(userId, "outlook");
 		if (token.outcome !== "ok") throw new BadRequestException(token.reason);
 		const response = await fetch(
