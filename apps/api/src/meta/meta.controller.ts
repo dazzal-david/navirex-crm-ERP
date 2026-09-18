@@ -10,6 +10,7 @@ import {
 	Req,
 } from "@nestjs/common";
 import { AllowAnonymous } from "@thallesp/nestjs-better-auth";
+import { type MetaWebhookPayload, metaWebhookPayload } from "./meta.contracts";
 import { MetaService } from "./meta.service";
 
 @Controller("api/integrations/meta/webhook")
@@ -35,9 +36,9 @@ export class MetaWebhookController {
 		const raw = await read(request, 1_000_000);
 		if (!raw) throw new BadRequestException("Webhook body is empty.");
 		this.meta.verifySignature(raw, signature);
-		let payload: unknown;
+		let payload: MetaWebhookPayload;
 		try {
-			payload = JSON.parse(raw);
+			payload = metaWebhookPayload.parse(JSON.parse(raw));
 		} catch {
 			throw new BadRequestException("Webhook body is invalid.");
 		}

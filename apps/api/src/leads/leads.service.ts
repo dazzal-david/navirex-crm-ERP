@@ -105,15 +105,16 @@ export class LeadsService {
 		userId: string,
 	): Promise<ColumnPageOutput> {
 		const where = this.where(input, userId);
+		const columnWhere: Prisma.LeadWhereInput = {
+			...where,
+			stage: input.stage,
+		};
+		if (input.cursor !== undefined) {
+			columnWhere.position = { gt: input.cursor };
+		}
 
 		const leads = await this.db.lead.findMany({
-			where: {
-				...where,
-				stage: input.stage,
-				...(input.cursor === undefined
-					? {}
-					: { position: { gt: input.cursor } }),
-			},
+			where: columnWhere,
 			select: cardSelect,
 			orderBy: [{ position: "asc" }, { createdAt: "desc" }],
 			take: LEADS.board.columnLimit,
@@ -410,15 +411,15 @@ export class LeadsService {
 					? "ASSIGNED"
 					: current.stage;
 
+		const data: Prisma.LeadUncheckedUpdateInput = { ownerId, stage };
+		if (stage !== current.stage) {
+			data.stageChangedAt = new Date();
+			data.position = await this.topOf(stage);
+		}
+
 		const lead = await this.db.lead.update({
 			where: { id },
-			data: {
-				ownerId,
-				stage,
-				...(stage !== current.stage
-					? { stageChangedAt: new Date(), position: await this.topOf(stage) }
-					: {}),
-			},
+			data,
 			select: cardSelect,
 		});
 
@@ -447,20 +448,19 @@ export class LeadsService {
 		);
 
 		const movedStage = input.stage !== current.stage;
+		const data: Prisma.LeadUncheckedUpdateInput = {
+			stage: input.stage,
+			position,
+		};
+		if (movedStage) data.stageChangedAt = new Date();
+		if (movedStage && input.stage !== "UNASSIGNED" && !current.ownerId) {
+			data.ownerId = userId;
+		}
+		if (movedStage && input.stage === "UNASSIGNED") data.ownerId = null;
 
 		const lead = await this.db.lead.update({
 			where: { id: input.id },
-			data: {
-				stage: input.stage,
-				position,
-				...(movedStage ? { stageChangedAt: new Date() } : {}),
-				...(movedStage && input.stage !== "UNASSIGNED" && !current.ownerId
-					? { ownerId: userId }
-					: {}),
-				...(movedStage && input.stage === "UNASSIGNED"
-					? { ownerId: null }
-					: {}),
-			},
+			data,
 			select: cardSelect,
 		});
 

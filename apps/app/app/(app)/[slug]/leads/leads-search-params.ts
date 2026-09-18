@@ -34,12 +34,11 @@ export const loadLeadSearchParams = createLoader(leadFilterParsers);
 
 export function toLeadFilters(values: LeadFilterValues): LeadFilters {
 	const q = values.q.trim();
-
-	return {
-		...(q ? { q } : {}),
-		...(values.entity ? { entity: values.entity } : {}),
-		...(values.kind ? { kind: values.kind } : {}),
-		...(values.owner && !values.mine ? { ownerId: values.owner } : {}),
-		...(values.mine ? { mine: true } : {}),
-	};
+	const filters: LeadFilters = {};
+	if (q) filters.q = q;
+	if (values.entity) filters.entity = values.entity;
+	if (values.kind) filters.kind = values.kind;
+	if (values.owner && !values.mine) filters.ownerId = values.owner;
+	if (values.mine) filters.mine = true;
+	return filters;
 }

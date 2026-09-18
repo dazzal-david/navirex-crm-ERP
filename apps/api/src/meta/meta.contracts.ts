@@ -1,5 +1,30 @@
 import { z } from "zod";
 
+export const metaWebhookPayload = z.object({
+	entry: z
+		.array(
+			z.object({
+				id: z.string().optional(),
+				changes: z
+					.array(
+						z.object({
+							field: z.string().optional(),
+							value: z
+								.object({
+									leadgen_id: z.string().optional(),
+									page_id: z.string().optional(),
+								})
+								.optional(),
+						}),
+					)
+					.optional(),
+			}),
+		)
+		.optional(),
+});
+
+export type MetaWebhookPayload = z.infer<typeof metaWebhookPayload>;
+
 export const metaPageOutput = z.object({
 	id: z.string(),
 	name: z.string(),

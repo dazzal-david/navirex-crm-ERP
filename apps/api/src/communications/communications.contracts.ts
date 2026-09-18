@@ -96,3 +96,5 @@ export const pinnedTemplateInput = z.object({
 		language: z.string(),
 	}),
 });
+
+export type PinnedTemplateInput = z.infer<typeof pinnedTemplateInput>;

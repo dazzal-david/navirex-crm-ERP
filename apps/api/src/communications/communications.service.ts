@@ -5,16 +5,31 @@ import {
 	OUTLOOK_SEND_SCOPE,
 	parseScopes,
 } from "@crm/auth";
-import { ActivityType, type Db } from "@crm/db";
+import { ActivityType, type Db, type Prisma } from "@crm/db";
 import {
 	BadRequestException,
 	Injectable,
 	NotFoundException,
 } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
+import { z } from "zod";
 import type { EnvironmentVariables } from "../config/env.validation";
 import { InjectDatabase } from "../database/database.constants";
 import { MailboxTokenService } from "../mailbox/mailbox-token.service";
+
+const communicationMetaValue = z.object({
+	channel: z.string().optional(),
+	direction: z.string().optional(),
+});
+
+type WhatsAppTemplate = {
+	name: string | undefined;
+	language: { code: string };
+	components?: {
+		type: "body";
+		parameters: { type: "text"; text: string }[];
+	}[];
+};
 
 @Injectable()
 export class CommunicationsService {
@@ -317,6 +332,22 @@ export class CommunicationsService {
 				"Add a valid international phone number first.",
 			);
 
+		const template: WhatsAppTemplate = {
+			name: input.templateName,
+			language: { code: input.language },
+		};
+		if (input.variables.length > 0) {
+			template.components = [
+				{
+					type: "body",
+					parameters: input.variables.map((text) => ({
+						type: "text",
+						text,
+					})),
+				},
+			];
+		}
+
 		const payload =
 			input.mode === "text"
 				? {
@@ -329,23 +360,7 @@ export class CommunicationsService {
 						messaging_product: "whatsapp",
 						to: phone,
 						type: "template",
-						template: {
-							name: input.templateName,
-							language: { code: input.language },
-							...(input.variables.length > 0
-								? {
-										components: [
-											{
-												type: "body",
-												parameters: input.variables.map((text) => ({
-													type: "text",
-													text,
-												})),
-											},
-										],
-									}
-								: {}),
-						},
+						template,
 					};
 
 		const response = await fetch(
@@ -499,17 +514,9 @@ export class CommunicationsService {
 	}
 }
 
-function communicationMeta(value: unknown): {
-	channel?: string;
-	direction?: string;
-} {
-	if (!value || typeof value !== "object" || Array.isArray(value)) return {};
-	const record = value as { channel?: unknown; direction?: unknown };
-	return {
-		channel: typeof record.channel === "string" ? record.channel : undefined,
-		direction:
-			typeof record.direction === "string" ? record.direction : undefined,
-	};
+function communicationMeta(value: Prisma.JsonValue | null) {
+	const parsed = communicationMetaValue.safeParse(value);
+	return parsed.success ? parsed.data : {};
 }
 
 function normalizePhone(value: string | null): string | null {

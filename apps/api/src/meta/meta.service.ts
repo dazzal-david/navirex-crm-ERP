@@ -11,7 +11,7 @@ import { ConfigService } from "@nestjs/config";
 import type { EnvironmentVariables } from "../config/env.validation";
 import { InjectDatabase } from "../database/database.constants";
 import { LeadsService } from "../leads/leads.service";
-import type { MetaPage } from "./meta.contracts";
+import type { MetaPage, MetaWebhookPayload } from "./meta.contracts";
 import { META } from "./meta-config";
 
 type GraphPage = { id: string; name: string; access_token?: string };
@@ -173,9 +173,10 @@ export class MetaService {
 				});
 			} catch (error) {
 				failed += 1;
+				const reason = error instanceof Error ? error.message : String(error);
 				await this.db.metaPageConnection.update({
 					where: { pageId: page.pageId },
-					data: { lastError: messageOf(error) },
+					data: { lastError: reason },
 				});
 			}
 		}
@@ -205,17 +206,8 @@ export class MetaService {
 		}
 	}
 
-	async webhook(payload: unknown): Promise<void> {
-		const body = payload as {
-			entry?: {
-				id?: string;
-				changes?: {
-					field?: string;
-					value?: { leadgen_id?: string; page_id?: string };
-				}[];
-			}[];
-		};
-		for (const entry of body.entry ?? []) {
+	async webhook(payload: MetaWebhookPayload): Promise<void> {
+		for (const entry of payload.entry ?? []) {
 			for (const change of entry.changes ?? []) {
 				const leadId = change.value?.leadgen_id;
 				const pageId = change.value?.page_id ?? entry.id;
@@ -235,15 +227,16 @@ export class MetaService {
 						data: { lastSyncedAt: new Date(), lastError: null },
 					});
 				} catch (error) {
+					const reason = error instanceof Error ? error.message : String(error);
 					this.logger.error({
 						message: "Meta lead could not be filed",
 						pageId,
 						leadId,
-						reason: messageOf(error),
+						reason,
 					});
 					await this.db.metaPageConnection.update({
 						where: { pageId },
-						data: { lastError: messageOf(error) },
+						data: { lastError: reason },
 					});
 				}
 			}
@@ -376,8 +369,4 @@ function pick(fields: Map<string, string>, ...names: string[]): string {
 		if (value?.trim()) return value.trim();
 	}
 	return "";
-}
-
-function messageOf(error: unknown): string {
-	return error instanceof Error ? error.message : String(error);
 }

@@ -51,10 +51,11 @@ export class PeopleService {
 	}
 
 	async updateMyProfile(input: UpdateMyProfileInput, userId: string) {
+		const data = myProfileData(input);
 		await this.db.employeeProfile.upsert({
 			where: { userId },
-			create: { userId, ...optionalText(input) },
-			update: optionalText(input),
+			create: { userId, ...data },
+			update: data,
 		});
 		return this.profile(userId);
 	}
@@ -67,6 +68,7 @@ export class PeopleService {
 		});
 		if (!target) throw new NotFoundException("That employee no longer exists.");
 		const { userId: targetId, designation, ...profile } = input;
+		const data = employeeProfileData(profile);
 		await this.db.$transaction([
 			this.db.user.update({
 				where: { id: targetId },
@@ -75,8 +77,8 @@ export class PeopleService {
 			}),
 			this.db.employeeProfile.upsert({
 				where: { userId: targetId },
-				create: { userId: targetId, ...optionalText(profile) },
-				update: optionalText(profile),
+				create: { userId: targetId, ...data },
+				update: data,
 			}),
 		]);
 		return this.profile(targetId);
@@ -258,11 +260,50 @@ function blank(value: string | undefined): string | null {
 	return normalized ? normalized : null;
 }
 
-function optionalText<T extends Record<string, unknown>>(input: T): T {
-	return Object.fromEntries(
-		Object.entries(input).map(([key, value]) => [
-			key,
-			typeof value === "string" ? blank(value) : value,
-		]),
-	) as T;
+type MyProfileData = {
+	phone?: string | null;
+	bio?: string | null;
+	emergencyContactName?: string | null;
+	emergencyContactPhone?: string | null;
+};
+
+function myProfileData(input: UpdateMyProfileInput): MyProfileData {
+	const data: MyProfileData = {};
+	if (input.phone !== undefined) data.phone = blank(input.phone);
+	if (input.bio !== undefined) data.bio = blank(input.bio);
+	if (input.emergencyContactName !== undefined) {
+		data.emergencyContactName = blank(input.emergencyContactName);
+	}
+	if (input.emergencyContactPhone !== undefined) {
+		data.emergencyContactPhone = blank(input.emergencyContactPhone);
+	}
+	return data;
+}
+
+type EmployeeProfileData = {
+	employeeCode?: string | null;
+	department?: string | null;
+	location?: string | null;
+	phone?: string | null;
+	employmentType?: string | null;
+	joinedAt?: Date;
+	managerId?: string | null;
+};
+
+type EmployeeProfileInput = Omit<UpdateEmployeeInput, "userId" | "designation">;
+
+function employeeProfileData(input: EmployeeProfileInput): EmployeeProfileData {
+	const data: EmployeeProfileData = {};
+	if (input.employeeCode !== undefined) {
+		data.employeeCode = blank(input.employeeCode);
+	}
+	if (input.department !== undefined) data.department = blank(input.department);
+	if (input.location !== undefined) data.location = blank(input.location);
+	if (input.phone !== undefined) data.phone = blank(input.phone);
+	if (input.employmentType !== undefined) {
+		data.employmentType = blank(input.employmentType);
+	}
+	if (input.joinedAt !== undefined) data.joinedAt = input.joinedAt;
+	if (input.managerId !== undefined) data.managerId = input.managerId;
+	return data;
 }

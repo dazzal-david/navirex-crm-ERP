@@ -1,5 +1,5 @@
 import { canManageTemplates, workspaceRoleOf } from "@crm/auth";
-import type { Db } from "@crm/db";
+import type { Db, Prisma } from "@crm/db";
 import {
 	ForbiddenException,
 	Injectable,
@@ -43,15 +43,14 @@ export class TemplatesService {
 		if (!current)
 			throw new NotFoundException("That template no longer exists.");
 		const { id, ...data } = input;
+		const update: Prisma.MessageTemplateUncheckedUpdateInput = { ...data };
+		if (data.subject !== undefined) update.subject = blank(data.subject);
+		if (data.providerTemplateName !== undefined) {
+			update.providerTemplateName = blank(data.providerTemplateName);
+		}
 		return this.db.messageTemplate.update({
 			where: { id },
-			data: {
-				...data,
-				...(data.subject === undefined ? {} : { subject: blank(data.subject) }),
-				...(data.providerTemplateName === undefined
-					? {}
-					: { providerTemplateName: blank(data.providerTemplateName) }),
-			},
+			data: update,
 		});
 	}
 

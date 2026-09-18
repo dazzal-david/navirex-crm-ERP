@@ -7,7 +7,10 @@ import {
 	Post,
 } from "@nestjs/common";
 import { AllowAnonymous } from "@thallesp/nestjs-better-auth";
-import { inboundLeadPayload } from "./webhooks.contracts";
+import {
+	type InboundLeadPayload,
+	inboundLeadPayload,
+} from "./webhooks.contracts";
 import { WebhooksService } from "./webhooks.service";
 
 @Controller("api/integrations/lead-webhooks")
@@ -20,7 +23,7 @@ export class WebhooksController {
 	receive(
 		@Param("id") id: string,
 		@Headers("x-webhook-secret") secret: string | undefined,
-		@Body() body: unknown,
+		@Body() body: InboundLeadPayload,
 	) {
 		return this.webhooks.receive(id, secret, inboundLeadPayload.parse(body));
 	}

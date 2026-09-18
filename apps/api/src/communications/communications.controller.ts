@@ -10,7 +10,10 @@ import {
 import { ConfigService } from "@nestjs/config";
 import { AllowAnonymous } from "@thallesp/nestjs-better-auth";
 import type { EnvironmentVariables } from "../config/env.validation";
-import { pinnedTemplateInput } from "./communications.contracts";
+import {
+	type PinnedTemplateInput,
+	pinnedTemplateInput,
+} from "./communications.contracts";
 import { CommunicationsService } from "./communications.service";
 
 @Controller("internal/communications")
@@ -29,7 +32,7 @@ export class CommunicationsController {
 	@HttpCode(200)
 	send(
 		@Headers("authorization") authorization: string | undefined,
-		@Body() body: unknown,
+		@Body() body: PinnedTemplateInput,
 	) {
 		if (!authorised(authorization, this.secret)) {
 			throw new UnauthorizedException("Agent authentication failed.");
