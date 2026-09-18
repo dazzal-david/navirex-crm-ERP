@@ -19,6 +19,7 @@ import {
 	MessageScrollerButton,
 	MessageScrollerContent,
 	MessageScrollerItem,
+	MessageScrollerProvider,
 	MessageScrollerViewport,
 } from "@crm/ui/components/message-scroller";
 import {
@@ -145,57 +146,59 @@ export function CommunicationsInbox() {
 									active.stage}
 							</p>
 						</header>
-						<MessageScroller className="flex-1">
-							<MessageScrollerViewport>
-								<MessageScrollerContent className="p-4">
-									{conversation.data?.items.length ? (
-										conversation.data.items.map((item) => (
-											<MessageScrollerItem key={item.id}>
-												{item.direction === "internal" ? (
-													<Marker variant="separator">
-														<MarkerContent>Internal note</MarkerContent>
-													</Marker>
-												) : null}
-												<Message
-													align={
-														item.direction === "outbound" ? "end" : "start"
-													}
-												>
-													<MessageContent>
-														<MessageHeader>
-															{channelLabel(item.channel)}
-															{item.subject ? ` · ${item.subject}` : ""}
-														</MessageHeader>
-														<Bubble
-															variant={
-																item.direction === "outbound"
-																	? "tinted"
-																	: item.direction === "internal"
-																		? "muted"
-																		: "outline"
-															}
-														>
-															<BubbleContent className="whitespace-pre-wrap">
-																{item.body}
-															</BubbleContent>
-														</Bubble>
-														<MessageFooter>
-															{item.authorName ?? active.name} ·{" "}
-															{new Date(item.occurredAt).toLocaleString()}
-														</MessageFooter>
-													</MessageContent>
-												</Message>
-											</MessageScrollerItem>
-										))
-									) : (
-										<div className="m-auto text-muted-foreground text-sm">
-											Start this conversation with a note or message.
-										</div>
-									)}
-								</MessageScrollerContent>
-							</MessageScrollerViewport>
-							<MessageScrollerButton />
-						</MessageScroller>
+						<MessageScrollerProvider autoScroll defaultScrollPosition="end">
+							<MessageScroller className="flex-1">
+								<MessageScrollerViewport>
+									<MessageScrollerContent className="p-4">
+										{conversation.data?.items.length ? (
+											conversation.data.items.map((item) => (
+												<MessageScrollerItem key={item.id}>
+													{item.direction === "internal" ? (
+														<Marker variant="separator">
+															<MarkerContent>Internal note</MarkerContent>
+														</Marker>
+													) : null}
+													<Message
+														align={
+															item.direction === "outbound" ? "end" : "start"
+														}
+													>
+														<MessageContent>
+															<MessageHeader>
+																{channelLabel(item.channel)}
+																{item.subject ? ` · ${item.subject}` : ""}
+															</MessageHeader>
+															<Bubble
+																variant={
+																	item.direction === "outbound"
+																		? "tinted"
+																		: item.direction === "internal"
+																			? "muted"
+																			: "outline"
+																}
+															>
+																<BubbleContent className="whitespace-pre-wrap">
+																	{item.body}
+																</BubbleContent>
+															</Bubble>
+															<MessageFooter>
+																{item.authorName ?? active.name} ·{" "}
+																{new Date(item.occurredAt).toLocaleString()}
+															</MessageFooter>
+														</MessageContent>
+													</Message>
+												</MessageScrollerItem>
+											))
+										) : (
+											<div className="m-auto text-muted-foreground text-sm">
+												Start this conversation with a note or message.
+											</div>
+										)}
+									</MessageScrollerContent>
+								</MessageScrollerViewport>
+								<MessageScrollerButton />
+							</MessageScroller>
+						</MessageScrollerProvider>
 						<div className="border-t p-3">
 							<div className="mb-2 flex flex-wrap gap-2">
 								{(["note", "email", "whatsapp"] as const).map((value) => (
