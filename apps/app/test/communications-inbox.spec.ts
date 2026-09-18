@@ -21,4 +21,11 @@ describe("communications inbox", () => {
 		expect(providerStart).toBeLessThan(scrollerStart);
 		expect(providerEnd).toBeGreaterThan(scrollerEnd);
 	});
+
+	test("polls the active conversation so inbound messages appear live", () => {
+		expect(source).toContain(
+			"refetchInterval: activeId === null ? false : 3_000",
+		);
+		expect(source).toContain("refetchIntervalInBackground: false");
+	});
 });

@@ -5,6 +5,7 @@ import {
 	Get,
 	Headers,
 	HttpCode,
+	Logger,
 	Post,
 	Query,
 	Req,
@@ -15,6 +16,8 @@ import { WhatsAppWebhookService } from "./whatsapp-webhook.service";
 
 @Controller("api/integrations/whatsapp/webhook")
 export class WhatsAppWebhookController {
+	private readonly logger = new Logger(WhatsAppWebhookController.name);
+
 	constructor(private readonly whatsapp: WhatsAppWebhookService) {}
 
 	@Get()
@@ -44,8 +47,12 @@ export class WhatsAppWebhookController {
 			throw new BadRequestException("WhatsApp webhook body is invalid JSON.");
 		}
 		const payload = whatsappWebhookPayload.safeParse(parsed);
-		if (!payload.success)
+		if (!payload.success) {
+			this.logger.warn(
+				`Rejected WhatsApp webhook payload at ${payload.error.issues[0]?.path.join(".") || "root"}.`,
+			);
 			throw new BadRequestException("WhatsApp webhook body is invalid.");
+		}
 		await this.whatsapp.receive(payload.data);
 		return { received: true };
 	}

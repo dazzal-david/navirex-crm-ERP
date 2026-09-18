@@ -54,7 +54,16 @@ export class WhatsAppWebhookService {
 	}
 
 	verifySignature(raw: string, signature: string | undefined): void {
-		if (!this.appSecret || !signature?.startsWith("sha256=")) {
+		if (!this.appSecret) {
+			this.logger.warn(
+				"Rejected WhatsApp webhook because the Meta app secret is not configured.",
+			);
+			throw new BadRequestException("WhatsApp webhook signature is missing.");
+		}
+		if (!signature?.startsWith("sha256=")) {
+			this.logger.warn(
+				"Rejected WhatsApp webhook because the signature header is missing.",
+			);
 			throw new BadRequestException("WhatsApp webhook signature is missing.");
 		}
 		const expected = createHmac("sha256", this.appSecret)
@@ -64,6 +73,9 @@ export class WhatsAppWebhookService {
 		const left = Buffer.from(expected, "hex");
 		const right = Buffer.from(received, "hex");
 		if (left.length !== right.length || !timingSafeEqual(left, right)) {
+			this.logger.warn(
+				"Rejected WhatsApp webhook because its signature does not match the configured Meta app secret.",
+			);
 			throw new BadRequestException("WhatsApp webhook signature is invalid.");
 		}
 	}

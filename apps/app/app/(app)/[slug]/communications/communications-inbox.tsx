@@ -40,9 +40,11 @@ type Channel = "note" | "email" | "whatsapp";
 export function CommunicationsInbox() {
 	const trpc = useTRPC();
 	const queryClient = useQueryClient();
-	const conversations = useQuery(
-		trpc.communications.conversations.queryOptions(),
-	);
+	const conversations = useQuery({
+		...trpc.communications.conversations.queryOptions(),
+		refetchInterval: 10_000,
+		refetchIntervalInBackground: false,
+	});
 	const status = useQuery(trpc.communications.status.queryOptions());
 	const templates = useQuery(trpc.templates.list.queryOptions());
 	const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -58,6 +60,8 @@ export function CommunicationsInbox() {
 			leadId: activeId ?? "",
 		}),
 		enabled: activeId !== null,
+		refetchInterval: activeId === null ? false : 3_000,
+		refetchIntervalInBackground: false,
 	});
 	const visible = leads.filter((lead) =>
 		`${lead.name} ${lead.companyName ?? ""} ${lead.email ?? ""}`
