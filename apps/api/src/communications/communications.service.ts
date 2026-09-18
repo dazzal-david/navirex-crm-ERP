@@ -20,6 +20,7 @@ import { MailboxTokenService } from "../mailbox/mailbox-token.service";
 const communicationMetaValue = z.object({
 	channel: z.string().optional(),
 	direction: z.string().optional(),
+	fromName: z.string().nullable().optional(),
 });
 
 type WhatsAppTemplate = {
@@ -165,7 +166,10 @@ export class CommunicationsService {
 								: ("internal" as const),
 					subject: activity.subject,
 					body: activity.body ?? activity.subject ?? "Activity",
-					authorName: activity.createdBy.name,
+					authorName:
+						meta.direction === "inbound"
+							? (meta.fromName ?? "WhatsApp contact")
+							: activity.createdBy.name,
 					occurredAt: activity.occurredAt ?? activity.createdAt,
 				};
 			}),

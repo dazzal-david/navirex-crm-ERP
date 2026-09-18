@@ -1,6 +1,7 @@
 import Chat from "@carbon/icons-react/es/Chat";
 import { StatusIndicator } from "@crm/ui/components/status-indicator";
 import { Suspense } from "react";
+import { API_URL } from "@/lib/env";
 import { requireSession } from "@/lib/session";
 import { getServerQueryClient, getServerTrpc } from "@/lib/trpc/server";
 import { ConnectionPage, ConnectionPageLoading } from "../connection-page";
@@ -53,6 +54,19 @@ async function WhatsAppConnectionPageContent({
 				<code className="rounded-lg border bg-muted p-3">
 					WHATSAPP_PHONE_NUMBER_ID
 				</code>
+				<code className="rounded-lg border bg-muted p-3">
+					WHATSAPP_APP_SECRET
+				</code>
+				<code className="rounded-lg border bg-muted p-3">
+					WHATSAPP_WEBHOOK_VERIFY_TOKEN
+				</code>
+				<h2 className="mt-3 font-medium">Meta webhook callback</h2>
+				<code className="overflow-x-auto rounded-lg border bg-muted p-3">
+					{API_URL}/api/integrations/whatsapp/webhook
+				</code>
+				<p className="text-muted-foreground">
+					Subscribe the callback to the WhatsApp <code>messages</code> field.
+				</p>
 			</section>
 		</ConnectionPage>
 	);

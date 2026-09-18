@@ -102,6 +102,15 @@ export class EnvironmentVariables {
 	WHATSAPP_PHONE_NUMBER_ID?: string;
 
 	@IsOptional()
+	@IsString()
+	WHATSAPP_APP_SECRET?: string;
+
+	@IsOptional()
+	@IsString()
+	@MinLength(16)
+	WHATSAPP_WEBHOOK_VERIFY_TOKEN?: string;
+
+	@IsOptional()
 	@IsUrl({ require_tld: false })
 	API_URL?: string;
 

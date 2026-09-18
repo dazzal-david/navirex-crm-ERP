@@ -46,6 +46,15 @@ Microsoft equivalent of `hd`**: `tenantId` is the whole of it.
 **Neither pair is required, but an install wants one of them or an SSO provider** —
 with none, the sign-in page says so by name rather than rendering nothing.
 
+**WhatsApp Cloud API** uses four API-only variables. `WHATSAPP_ACCESS_TOKEN` and
+`WHATSAPP_PHONE_NUMBER_ID` send messages. `WHATSAPP_APP_SECRET` validates signed
+webhook deliveries, while `WHATSAPP_WEBHOOK_VERIFY_TOKEN` must match the value entered
+in Meta when registering `<API_URL>/api/integrations/whatsapp/webhook`. Subscribe the
+callback to the `messages` field. A repeated Meta message ID upserts the same CRM
+activity, so webhook retries do not duplicate a conversation entry. If WhatsApp and
+Lead Ads use the same Meta app, `META_CLIENT_SECRET` is accepted as the webhook signing
+secret when `WHATSAPP_APP_SECRET` is absent.
+
 **`ALLOWED_SIGN_IN`** — comma-separated whole domains or single addresses (bare
 addresses exist for a solo self-hoster, where `gmail.com` would be an open door). **One
 list, read by the sign-in guard *and* the sync's "which side is external" decision** —
