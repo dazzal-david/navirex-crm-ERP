@@ -157,7 +157,8 @@ function parseZoho(input: string): ZohoRow[] {
 				phone: value(row, "Phone", "Mobile") || undefined,
 				stage,
 				source: value(row, "Lead Source", "Source") || "Zoho CRM",
-				country: value(row, "Country") || undefined,
+				country:
+					value(row, "Country", "Address - Country / Region") || undefined,
 				notes: value(row, "Description", "Notes") || undefined,
 			},
 		];

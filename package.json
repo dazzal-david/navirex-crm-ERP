@@ -21,6 +21,7 @@
 		"db:reset": "turbo run db:reset",
 		"db:seed": "turbo run db:seed",
 		"db:studio": "turbo run db:studio",
+		"zoho:import": "bun packages/db/scripts/zoho-import.ts",
 		"db:test": "bun run --filter=@crm/db db:test"
 	},
 	"devDependencies": {
