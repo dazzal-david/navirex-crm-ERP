@@ -11,6 +11,7 @@ import {
 	Req,
 } from "@nestjs/common";
 import { AllowAnonymous } from "@thallesp/nestjs-better-auth";
+import { z } from "zod";
 import { whatsappWebhookPayload } from "./whatsapp-webhook.contracts";
 import { WhatsAppWebhookService } from "./whatsapp-webhook.service";
 
@@ -37,7 +38,7 @@ export class WhatsAppWebhookController {
 		@Req() request: IncomingMessage,
 		@Headers("x-hub-signature-256") signature?: string,
 	) {
-		const raw = await read(request, 1_000_000);
+		const raw = await readWebhookBody(request, 1_000_000);
 		if (!raw) throw new BadRequestException("Webhook body is empty.");
 		this.whatsapp.verifySignature(raw, signature);
 		let parsed: unknown;
@@ -58,8 +59,8 @@ export class WhatsAppWebhookController {
 	}
 }
 
-async function read(
-	request: IncomingMessage,
+export async function readWebhookBody(
+	request: IncomingMessage & { body?: unknown },
 	limit: number,
 ): Promise<string | null> {
 	let body = "";
@@ -67,5 +68,25 @@ async function read(
 		body += Buffer.isBuffer(chunk) ? chunk.toString("utf8") : String(chunk);
 		if (Buffer.byteLength(body) > limit) return null;
 	}
-	return body || null;
+	if (body) return body;
+
+	let parsed: unknown;
+	try {
+		parsed = request.body;
+	} catch {
+		return null;
+	}
+	if (Buffer.isBuffer(parsed)) {
+		return parsed.byteLength <= limit ? parsed.toString("utf8") : null;
+	}
+	const text = z.string().safeParse(parsed);
+	if (text.success) {
+		return Buffer.byteLength(text.data) <= limit ? text.data : null;
+	}
+	const json = z.json().safeParse(parsed);
+	if (json.success) {
+		const serialized = JSON.stringify(json.data);
+		return Buffer.byteLength(serialized) <= limit ? serialized : null;
+	}
+	return null;
 }

@@ -1,10 +1,12 @@
 import { describe, expect, it } from "bun:test";
 import { createHmac } from "node:crypto";
+import { Readable } from "node:stream";
 import {
 	whatsappMessageBody,
 	whatsappTimestamp,
 	whatsappWebhookPayload,
 } from "../src/communications/whatsapp-webhook.contracts";
+import { readWebhookBody } from "../src/communications/whatsapp-webhook.controller";
 import { WhatsAppWebhookService } from "../src/communications/whatsapp-webhook.service";
 
 const VERIFY_TOKEN = "verify-token-long-enough";
@@ -25,6 +27,15 @@ function service() {
 }
 
 describe("WhatsApp webhook verification", () => {
+	it("reads Vercel's parsed JSON body after the request stream is consumed", async () => {
+		const request = Readable.from([]) as Readable & { body?: unknown };
+		request.body = { object: "whatsapp_business_account", entry: [] };
+
+		expect(await readWebhookBody(request as never, 1_000_000)).toBe(
+			'{"object":"whatsapp_business_account","entry":[]}',
+		);
+	});
+
 	it("returns Meta's challenge only for the configured token", () => {
 		expect(service().verify("subscribe", "challenge-123", VERIFY_TOKEN)).toBe(
 			"challenge-123",
