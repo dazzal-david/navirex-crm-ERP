@@ -6,6 +6,11 @@
 
 @custom-variant dark (&:is(.dark *));
 
+html,
+body {
+	overscroll-behavior: none;
+}
+
 :root {
 	--background: #ffffff;
 	--foreground: #171717;

@@ -120,6 +120,10 @@ export class EnvironmentVariables {
 
 	@IsOptional()
 	@IsString()
+	WHATSAPP_BUSINESS_ACCOUNT_ID?: string;
+
+	@IsOptional()
+	@IsString()
 	WHATSAPP_APP_SECRET?: string;
 
 	@IsOptional()

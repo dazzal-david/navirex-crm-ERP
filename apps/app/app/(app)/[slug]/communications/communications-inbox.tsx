@@ -38,6 +38,7 @@ import { useOpenRecord } from "@/components/crm/record-sheet/record-stack";
 import { useTRPC } from "@/lib/trpc/client";
 
 type Channel = "note" | "email" | "whatsapp";
+type TemplateVariable = { position: number; value: string };
 
 export function CommunicationsInbox() {
 	const trpc = useTRPC();
@@ -49,12 +50,21 @@ export function CommunicationsInbox() {
 		refetchIntervalInBackground: false,
 	});
 	const status = useQuery(trpc.communications.status.queryOptions());
-	const templates = useQuery(trpc.templates.list.queryOptions());
+	const templates = useQuery({
+		...trpc.templates.list.queryOptions(),
+		refetchInterval: 60_000,
+	});
 	const [selectedId, setSelectedId] = useState<string | null>(null);
 	const [query, setQuery] = useState("");
 	const [channel, setChannel] = useState<Channel>("note");
 	const [subject, setSubject] = useState("Following up from Navirex");
 	const [body, setBody] = useState("");
+	const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(
+		null,
+	);
+	const [templateVariables, setTemplateVariables] = useState<
+		TemplateVariable[]
+	>([]);
 	const leads = conversations.data ?? [];
 	const activeId = selectedId ?? leads[0]?.id ?? null;
 	const active = leads.find((lead) => lead.id === activeId) ?? null;
@@ -84,6 +94,8 @@ export function CommunicationsInbox() {
 			}),
 		]);
 		setBody("");
+		setSelectedTemplateId(null);
+		setTemplateVariables([]);
 	};
 	const note = useMutation(
 		trpc.communications.addNote.mutationOptions({
@@ -103,9 +115,17 @@ export function CommunicationsInbox() {
 			onError: (error) => toast.error(error.message),
 		}),
 	);
+	const selectedTemplate = templates.data?.find(
+		(template) => template.id === selectedTemplateId,
+	);
 	const pending = note.isPending || email.isPending || whatsapp.isPending;
 	const canSend =
-		Boolean(activeId && body.trim()) &&
+		Boolean(
+			activeId &&
+				(body.trim() ||
+					(channel === "whatsapp" && selectedTemplate?.providerTemplateName)),
+		) &&
+		templateVariables.every((variable) => variable.value.trim()) &&
 		(channel === "note" ||
 			(channel === "email" &&
 				Boolean(status.data?.email.google || status.data?.email.microsoft)) ||
@@ -223,7 +243,11 @@ export function CommunicationsInbox() {
 										key={value}
 										size="sm"
 										variant={channel === value ? "default" : "outline"}
-										onClick={() => setChannel(value)}
+										onClick={() => {
+											setChannel(value);
+											setSelectedTemplateId(null);
+											setTemplateVariables([]);
+										}}
 									>
 										<Icon
 											icon={
@@ -244,6 +268,15 @@ export function CommunicationsInbox() {
 											(item) => item.id === id,
 										);
 										if (!template) return;
+										setSelectedTemplateId(template.id);
+										setTemplateVariables(
+											template.channel === "WHATSAPP" &&
+												template.providerTemplateName
+												? templateVariablePositions(template.body).map(
+														(position) => ({ position, value: "" }),
+													)
+												: [],
+										);
 										setChannel(template.channel.toLowerCase() as Channel);
 										setSubject(template.subject ?? "Following up from Navirex");
 										setBody(template.body);
@@ -275,12 +308,33 @@ export function CommunicationsInbox() {
 								rows={3}
 								value={body}
 								onChange={(event) => setBody(event.target.value)}
+								readOnly={Boolean(selectedTemplate?.providerTemplateName)}
 								placeholder={
 									channel === "note"
 										? "Add an internal note…"
 										: "Write a message…"
 								}
 							/>
+							{templateVariables.length > 0 ? (
+								<div className="mt-2 grid gap-2 sm:grid-cols-2">
+									{templateVariables.map((variable) => (
+										<Input
+											key={variable.position}
+											value={variable.value}
+											placeholder={`Template value ${variable.position}`}
+											onChange={(event) =>
+												setTemplateVariables((current) =>
+													current.map((item) =>
+														item.position === variable.position
+															? { ...item, value: event.target.value }
+															: item,
+													),
+												)
+											}
+										/>
+									))}
+								</div>
+							) : null}
 							<div className="mt-2 flex items-center justify-between gap-3">
 								<p className="text-muted-foreground text-xs">
 									{channel === "note"
@@ -301,14 +355,29 @@ export function CommunicationsInbox() {
 											note.mutate({ leadId: activeId, body });
 										if (channel === "email")
 											email.mutate({ leadId: activeId, subject, body });
-										if (channel === "whatsapp")
-											whatsapp.mutate({
-												leadId: activeId,
-												mode: "text",
-												body,
-												language: "en_US",
-												variables: [],
-											});
+										if (channel === "whatsapp") {
+											const providerName =
+												selectedTemplate?.providerTemplateName;
+											whatsapp.mutate(
+												providerName
+													? {
+															leadId: activeId,
+															mode: "template",
+															templateName: providerName,
+															language: selectedTemplate.language,
+															variables: templateVariables.map(
+																(variable) => variable.value,
+															),
+														}
+													: {
+															leadId: activeId,
+															mode: "text",
+															body,
+															language: "en_US",
+															variables: [],
+														},
+											);
+										}
 									}}
 								>
 									Send
@@ -332,4 +401,14 @@ function channelLabel(channel: Channel): string {
 		: channel === "whatsapp"
 			? "WhatsApp"
 			: "Note";
+}
+
+function templateVariablePositions(body: string): number[] {
+	return [
+		...new Set(
+			Array.from(body.matchAll(/{{\s*(\d+)\s*}}/g), (match) =>
+				Number(match[1] ?? 0),
+			),
+		),
+	].sort((left, right) => left - right);
 }

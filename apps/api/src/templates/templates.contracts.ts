@@ -9,6 +9,10 @@ export const templateOutput = z.object({
 	subject: z.string().nullable(),
 	body: z.string(),
 	providerTemplateName: z.string().nullable(),
+	providerTemplateId: z.string().nullable(),
+	providerStatus: z.string().nullable(),
+	providerCategory: z.string().nullable(),
+	providerSyncedAt: z.date().nullable(),
 	language: z.string(),
 	active: z.boolean(),
 	createdAt: z.date(),
@@ -16,6 +20,29 @@ export const templateOutput = z.object({
 });
 
 export const templatesOutput = z.array(templateOutput);
+
+export const metaTemplateSyncStatusOutput = z.object({
+	configured: z.boolean(),
+	accessTokenConfigured: z.boolean(),
+	businessAccountId: z.string().nullable(),
+	lastAttemptAt: z.date().nullable(),
+	lastSyncedAt: z.date().nullable(),
+	lastError: z.string().nullable(),
+	refreshIntervalMinutes: z.number().int(),
+});
+
+export const metaBusinessAccountInput = z.object({
+	businessAccountId: z.string().trim().regex(/^\d+$/).max(64),
+});
+
+export const metaTemplateSyncOutput = z.object({
+	fetched: z.number().int(),
+	approved: z.number().int(),
+	created: z.number().int(),
+	updated: z.number().int(),
+	deactivated: z.number().int(),
+	syncedAt: z.date(),
+});
 
 export const templateCreateInput = z.object({
 	name: z.string().trim().min(1).max(120),
@@ -36,3 +63,4 @@ export const templateIdInput = z.object({ id: z.string() });
 export type TemplateCreateInput = z.infer<typeof templateCreateInput>;
 export type TemplateUpdateInput = z.infer<typeof templateUpdateInput>;
 export type TemplateOutput = z.infer<typeof templateOutput>;
+export type MetaTemplateSyncOutput = z.infer<typeof metaTemplateSyncOutput>;

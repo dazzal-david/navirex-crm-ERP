@@ -1072,6 +1072,10 @@ model MessageTemplate {
 	subject String?
 	body String
 	providerTemplateName String?
+	providerTemplateId String? @unique
+	providerStatus String?
+	providerCategory String?
+	providerSyncedAt DateTime?
 	language String @default("en_US")
 	active Boolean @default(true)
 
@@ -1522,6 +1526,11 @@ model AppSetting {
 
   reimbursementNotifyManager Boolean @default(true)
   reimbursementNotificationEmails String[] @default([])
+
+  whatsappBusinessAccountId String?
+  whatsappTemplatesLastAttemptAt DateTime?
+  whatsappTemplatesLastSyncedAt DateTime?
+  whatsappTemplatesLastError String?
 
   trackingSiteId           String? @unique
   trackingCrossDomain      Boolean @default(true)

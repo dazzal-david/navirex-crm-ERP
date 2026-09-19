@@ -11,6 +11,9 @@ import type { z } from "zod";
 import type { AuthedTrpcContext } from "../trpc/context.types";
 import { AuthMiddleware } from "../trpc/middlewares/auth.middleware";
 import {
+	metaBusinessAccountInput,
+	metaTemplateSyncOutput,
+	metaTemplateSyncStatusOutput,
 	type TemplateOutput,
 	templateCreateInput,
 	templateOutput,
@@ -29,6 +32,27 @@ export class TemplatesRouter {
 	@Query({ output: templatesOutput })
 	list(): Promise<TemplateOutput[]> {
 		return this.templates.list();
+	}
+
+	@Query({ output: metaTemplateSyncStatusOutput })
+	metaSyncStatus() {
+		return this.templates.metaSyncStatus();
+	}
+
+	@Mutation({ output: metaTemplateSyncOutput })
+	syncMeta(@Ctx() ctx: AuthedTrpcContext) {
+		return this.templates.syncMeta(ctx.user.id);
+	}
+
+	@Mutation({
+		input: metaBusinessAccountInput,
+		output: metaTemplateSyncStatusOutput,
+	})
+	configureMeta(
+		@Input() input: z.infer<typeof metaBusinessAccountInput>,
+		@Ctx() ctx: AuthedTrpcContext,
+	) {
+		return this.templates.configureMeta(input.businessAccountId, ctx.user.id);
 	}
 
 	@Mutation({ input: templateCreateInput, output: templateOutput })

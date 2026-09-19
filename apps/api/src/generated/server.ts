@@ -34,7 +34,7 @@ import { savedViewListInput, savedViewListOutput, savedViewCreateInput, savedVie
 import { agentModelOutput, modelCatalogOutput, setAgentModelInput, researchKeyOutput, setResearchKeyInput, archiveRetentionOutput, setArchiveRetentionDaysInput, reimbursementNotificationsOutput, setReimbursementNotificationsInput } from "../settings/settings.contracts";
 import { slackStatusOutput, slackMatchesOutput, slackChannelsInput, slackChannelsOutput, slackJoinChannelInput, slackJoinChannelOutput, slackRefreshPeopleOutput, slackCreateChannelInput, slackCreateChannelOutput, slackDisconnectOutput } from "../slack/slack.contracts";
 import { ssoSignInOptionsOutput, ssoSettingsOutput, ssoProviderListInput, ssoProviderListOutput, registerSsoProviderInput, ssoProviderOutput, deleteSsoProviderInput, deleteSsoProviderOutput } from "../sso/sso.contracts";
-import { templatesOutput, templateCreateInput, templateOutput, templateUpdateInput } from "../templates/templates.contracts";
+import { templatesOutput, metaTemplateSyncStatusOutput, metaTemplateSyncOutput, metaBusinessAccountInput, templateCreateInput, templateOutput, templateUpdateInput } from "../templates/templates.contracts";
 import { trackingSettingsOutput, trackingFlagInput, cookieLifetimeInput, addDomainInput, trackedDomainOutput, removeDomainInput, rotateSiteIdOutput, verifyInput, verifyOutput, sourcesOutput, companyActivityInput, websiteActivityOutput, contactActivityInput } from "../tracking/tracking.contracts";
 import { webhooksOutput, webhookCreateInput, webhookCreateOutput, webhookUpdateInput, webhookOutput } from "../webhooks/webhooks.contracts";
 import { workspaceOutput, memberListInput, memberListOutput, updateWorkspaceInput, setMemberRoleInput, workspaceMemberOutput } from "../workspace/workspace.contracts";
@@ -828,6 +828,16 @@ const appRouter = t.router({
     list: publicProcedure
       .output(templatesOutput)
       .query(async () => "PLACEHOLDER_DO_NOT_REMOVE" as any),
+    metaSyncStatus: publicProcedure
+      .output(metaTemplateSyncStatusOutput)
+      .query(async () => "PLACEHOLDER_DO_NOT_REMOVE" as any),
+    syncMeta: publicProcedure
+      .output(metaTemplateSyncOutput)
+      .mutation(async () => "PLACEHOLDER_DO_NOT_REMOVE" as any),
+    configureMeta: publicProcedure
+      .input(metaBusinessAccountInput)
+      .output(metaTemplateSyncStatusOutput)
+      .mutation(async () => "PLACEHOLDER_DO_NOT_REMOVE" as any),
     create: publicProcedure
       .input(templateCreateInput)
       .output(templateOutput)

@@ -1,5 +1,6 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { ActivityType, type Db, type Prisma } from "@crm/db";
+import { SETTINGS_ID } from "@crm/db/settings";
 import { BadRequestException, Injectable, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { z } from "zod";
@@ -90,6 +91,13 @@ export class WhatsAppWebhookService {
 					value.metadata.phone_number_id !== this.phoneNumberId
 				)
 					continue;
+				if (entry.id) {
+					await this.db.appSetting.upsert({
+						where: { id: SETTINGS_ID },
+						create: { id: SETTINGS_ID, whatsappBusinessAccountId: entry.id },
+						update: { whatsappBusinessAccountId: entry.id },
+					});
+				}
 
 				const names = new Map(
 					(value.contacts ?? []).flatMap((contact) =>

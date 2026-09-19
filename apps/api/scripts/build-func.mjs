@@ -178,6 +178,7 @@ writeFileSync(
 		version: 3,
 		routes: [{ src: "/(.*)", dest: "/api/index" }],
 		crons: [
+			{ path: "/internal/sync/meta-templates", schedule: "15 2 * * *" },
 			{ path: "/internal/sync/mailboxes", schedule: "0 3 * * *" },
 			{ path: "/internal/sync/rates", schedule: "0 6 * * *" },
 			{ path: "/internal/telemetry/rollup", schedule: "0 7 * * *" },

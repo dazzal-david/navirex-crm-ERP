@@ -69,15 +69,15 @@ export function LeadList() {
 	}
 
 	return (
-		<div className="min-h-0 overflow-hidden rounded-2xl border bg-card shadow-sm">
-			<div className="flex items-center justify-between border-b bg-muted/30 px-5 py-3">
+		<div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border bg-card shadow-sm">
+			<div className="flex shrink-0 items-center justify-between border-b bg-muted/30 px-5 py-3">
 				<p className="font-medium text-sm">All leads</p>
 				<p className="text-muted-foreground text-xs tabular-nums">
 					{total} records
 				</p>
 			</div>
-			<Table>
-				<TableHeader className="bg-muted/20">
+			<Table containerClassName="min-h-0 flex-1 overflow-auto overscroll-none">
+				<TableHeader className="sticky top-0 z-10 bg-card/95 backdrop-blur-sm">
 					<TableRow>
 						<TableHead className="w-[24%] px-5">Lead</TableHead>
 						<TableHead>Company</TableHead>
