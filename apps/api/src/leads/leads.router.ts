@@ -23,6 +23,8 @@ import {
 	leadIdInput,
 	leadIntakeInput,
 	leadIntakeOutput,
+	leadListInput,
+	leadListOutput,
 	leadMoveInput,
 	leadMutateOutput,
 	leadOwnersOutput,
@@ -59,6 +61,18 @@ export class LeadsRouter {
 		@Ctx() ctx: AuthedTrpcContext,
 	) {
 		return this.leads.column(input, ctx.user.id);
+	}
+
+	@Query({
+		input: leadListInput,
+		output: leadListOutput,
+		meta: restMeta("POST", "/leads/list", ["Leads"]),
+	})
+	async list(
+		@Input() input: z.infer<typeof leadListInput>,
+		@Ctx() ctx: AuthedTrpcContext,
+	) {
+		return this.leads.list(input, ctx.user.id);
 	}
 
 	@Query({

@@ -66,6 +66,16 @@ export const columnPageOutput = z.object({
 	nextCursor: z.number().int().nullable(),
 });
 
+export const leadListInput = boardInput.extend({
+	cursor: z.string().optional(),
+});
+
+export const leadListOutput = z.object({
+	leads: z.array(leadCard),
+	total: z.number(),
+	nextCursor: z.string().nullable(),
+});
+
 export const boardOutput = z.object({
 	columns: z.array(boardColumn),
 });
@@ -168,3 +178,5 @@ export type LeadMoveInput = z.infer<typeof leadMoveInput>;
 export type LeadStage = z.infer<typeof leadStage>;
 export type ColumnPageInput = z.infer<typeof columnPageInput>;
 export type ColumnPageOutput = z.infer<typeof columnPageOutput>;
+export type LeadListInput = z.infer<typeof leadListInput>;
+export type LeadListOutput = z.infer<typeof leadListOutput>;

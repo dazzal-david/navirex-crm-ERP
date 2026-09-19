@@ -72,6 +72,20 @@ const SOURCE_COLORS = [
 	"var(--chart-5)",
 ] as const;
 const LOADING_CARDS = ["total", "new", "attention", "unassigned"] as const;
+const SUMMARY_CARD_STYLE = [
+	"bg-gradient-to-br from-emerald-50 to-background dark:from-emerald-950/30",
+	"bg-gradient-to-br from-sky-50 to-background dark:from-sky-950/30",
+	"bg-gradient-to-br from-amber-50 to-background dark:from-amber-950/30",
+	"bg-gradient-to-br from-violet-50 to-background dark:from-violet-950/30",
+] as const;
+const STAGE_CARD_STYLE = [
+	"border-amber-200/70 bg-amber-50/60 dark:border-amber-900/60 dark:bg-amber-950/20",
+	"border-sky-200/70 bg-sky-50/60 dark:border-sky-900/60 dark:bg-sky-950/20",
+	"border-violet-200/70 bg-violet-50/60 dark:border-violet-900/60 dark:bg-violet-950/20",
+	"border-emerald-200/70 bg-emerald-50/60 dark:border-emerald-900/60 dark:bg-emerald-950/20",
+	"border-rose-200/70 bg-rose-50/60 dark:border-rose-900/60 dark:bg-rose-950/20",
+	"border-green-200/70 bg-green-50/60 dark:border-green-900/60 dark:bg-green-950/20",
+] as const;
 const STAGE_TONE = {
 	UNASSIGNED: "warning",
 	ASSIGNED: "neutral",
@@ -110,25 +124,29 @@ export function DashboardSummary() {
 	);
 
 	return (
-		<div className="flex flex-col gap-6">
-			<div className="grid overflow-hidden border sm:grid-cols-2 xl:grid-cols-4 [&>*:nth-child(n+2)]:border-t sm:[&>*:nth-child(2)]:border-t-0 sm:[&>*:nth-child(2n)]:border-l xl:[&>*]:border-t-0 xl:[&>*]:border-l xl:[&>*:first-child]:border-l-0">
+		<div className="flex flex-col gap-8">
+			<div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
 				<StatCard
+					className={`rounded-2xl border shadow-sm ${SUMMARY_CARD_STYLE[0]}`}
 					label="Total leads"
 					value={summary.totals.all}
 					description={`${formatCount(summary.totals.active, "lead")} still active`}
 				/>
 				<StatCard
+					className={`rounded-2xl border shadow-sm ${SUMMARY_CARD_STYLE[1]}`}
 					label="New this week"
 					value={summary.totals.newThisWeek}
 					delta={weekDelta}
 					description={`${summary.totals.newPreviousWeek} in the previous seven days`}
 				/>
 				<StatCard
+					className={`rounded-2xl border shadow-sm ${SUMMARY_CARD_STYLE[2]}`}
 					label="Needs attention"
 					value={summary.totals.needsAttention}
 					description="Active leads without activity for seven days"
 				/>
 				<StatCard
+					className={`rounded-2xl border shadow-sm ${SUMMARY_CARD_STYLE[3]}`}
 					label="Unassigned"
 					value={summary.totals.unassigned}
 					description="New leads waiting for an owner"
@@ -145,8 +163,12 @@ export function DashboardSummary() {
 				}
 			>
 				<DashboardGrid columns={3}>
-					{summary.stages.map((stage) => (
-						<KpiCard key={stage.stage} title={LEAD_BOARD.label[stage.stage]}>
+					{summary.stages.map((stage, index) => (
+						<KpiCard
+							className={`rounded-2xl shadow-sm ${STAGE_CARD_STYLE[index] ?? ""}`}
+							key={stage.stage}
+							title={LEAD_BOARD.label[stage.stage]}
+						>
 							<div className="flex items-end justify-between gap-4">
 								<span className="font-medium text-3xl tracking-tight tabular-nums">
 									{stage.count}
@@ -165,6 +187,7 @@ export function DashboardSummary() {
 
 			<DashboardRow split="hero">
 				<ChartCard
+					className="overflow-hidden rounded-2xl bg-card shadow-sm"
 					title="Lead intake"
 					description="New leads received during the last fourteen days"
 					footer={`${formatCount(summary.totals.newThisWeek, "lead")} received this week`}
@@ -185,6 +208,7 @@ export function DashboardSummary() {
 				</ChartCard>
 
 				<ChartCard
+					className="overflow-hidden rounded-2xl bg-gradient-to-br from-card to-sky-50/60 shadow-sm dark:to-sky-950/20"
 					title="Lead sources"
 					description="Where current leads entered the CRM"
 				>
@@ -224,7 +248,7 @@ export function DashboardSummary() {
 			</DashboardRow>
 
 			<div className="grid gap-6 @4xl/page-content:grid-cols-2">
-				<Card className="min-w-0">
+				<Card className="min-w-0 rounded-2xl border bg-card p-5 shadow-sm">
 					<CardHeader>
 						<CardTitle>Needs attention</CardTitle>
 						<CardDescription>
@@ -285,7 +309,7 @@ export function DashboardSummary() {
 					</CardPanel>
 				</Card>
 
-				<Card className="min-w-0">
+				<Card className="min-w-0 rounded-2xl border bg-card p-5 shadow-sm">
 					<CardHeader>
 						<CardTitle>Important updates</CardTitle>
 						<CardDescription>
@@ -341,7 +365,7 @@ export function DashboardSummary() {
 				title="Navirex coverage"
 				description="Lead distribution across operating entities"
 			>
-				<div className="grid overflow-hidden border sm:grid-cols-3 sm:[&>*+*]:border-l">
+				<div className="grid overflow-hidden rounded-2xl border bg-gradient-to-r from-emerald-50/70 via-background to-amber-50/70 shadow-sm sm:grid-cols-3 sm:[&>*+*]:border-l dark:from-emerald-950/20 dark:to-amber-950/20">
 					{summary.entities.map((entity) => (
 						<StatCard
 							key={entity.entity ?? "unassigned"}

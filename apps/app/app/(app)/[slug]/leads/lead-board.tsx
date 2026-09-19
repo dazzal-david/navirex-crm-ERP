@@ -1,8 +1,11 @@
 "use client";
 
+import Grid from "@carbon/icons-react/es/Grid";
+import List from "@carbon/icons-react/es/List";
 import { Badge } from "@crm/ui/components/badge";
 import { Button } from "@crm/ui/components/button";
 import { Card, CardContent } from "@crm/ui/components/card";
+import { Icon } from "@crm/ui/components/icon";
 import { PersonAvatar } from "@crm/ui/components/person-avatar";
 import { Skeleton } from "@crm/ui/components/skeleton";
 import { Spinner } from "@crm/ui/components/spinner";
@@ -22,6 +25,7 @@ import { LEAD_BOARD } from "@/lib/leads/board-config";
 import { useTRPC } from "@/lib/trpc/client";
 import type { RouterOutputs } from "@/lib/trpc/types";
 import { LeadFilters, useLeadFilters } from "./lead-filters";
+import { LeadList } from "./lead-list";
 import type { LeadFilters as LeadFilterInput } from "./leads-search-params";
 
 type LeadStage = (typeof LEAD_BOARD.stages)[number];
@@ -54,6 +58,7 @@ export function LeadBoard() {
 	const board = useQuery(options);
 	const [dragging, setDragging] = useState<LeadCard | null>(null);
 	const [dropTarget, setDropTarget] = useState<DropTarget | null>(null);
+	const [view, setView] = useState<"board" | "list">("board");
 
 	const columnQueryKey = (stage: LeadStage) =>
 		trpc.leads.column.infiniteQueryOptions(
@@ -134,6 +139,9 @@ export function LeadBoard() {
 				Promise.all([
 					queryClient.invalidateQueries({ queryKey: options.queryKey }),
 					queryClient.invalidateQueries({
+						queryKey: trpc.leads.list.pathKey(),
+					}),
+					queryClient.invalidateQueries({
 						queryKey: trpc.leads.column.pathKey(),
 					}),
 					queryClient.invalidateQueries({
@@ -161,10 +169,34 @@ export function LeadBoard() {
 	}
 
 	return (
-		<div className="flex min-h-0 flex-1 flex-col gap-3">
-			<LeadFilters loading={board.isFetching} />
+		<div className="flex min-h-0 flex-1 flex-col gap-4">
+			<div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border bg-card p-3 shadow-sm">
+				<LeadFilters loading={board.isFetching} />
+				<div className="flex rounded-lg border bg-muted/40 p-1">
+					<Button
+						aria-label="Board view"
+						onClick={() => setView("board")}
+						size="sm"
+						variant={view === "board" ? "default" : "ghost"}
+					>
+						<Icon icon={Grid} data-icon="inline-start" />
+						Board
+					</Button>
+					<Button
+						aria-label="List view"
+						onClick={() => setView("list")}
+						size="sm"
+						variant={view === "list" ? "default" : "ghost"}
+					>
+						<Icon icon={List} data-icon="inline-start" />
+						List
+					</Button>
+				</div>
+			</div>
 
-			{board.isPending ? (
+			{view === "list" ? (
+				<LeadList />
+			) : board.isPending ? (
 				<div className="flex gap-4 overflow-x-auto">
 					{LEAD_BOARD.stages.map((stage) => (
 						<Skeleton className="h-64 w-72 shrink-0 rounded-lg" key={stage} />
@@ -175,7 +207,7 @@ export function LeadBoard() {
 					The board did not load. {board.error.message}
 				</p>
 			) : (
-				<div className="flex min-h-0 flex-1 gap-4 overflow-x-auto">
+				<div className="flex min-h-0 flex-1 gap-4 overflow-x-auto pb-2">
 					{board.data.columns.map((column) => (
 						<LeadColumn
 							column={column}
@@ -235,7 +267,7 @@ function LeadColumn({
 		<section
 			aria-label={LEAD_BOARD.label[column.stage]}
 			className={cn(
-				"flex w-72 shrink-0 flex-col rounded-lg border bg-card",
+				"flex w-80 shrink-0 flex-col overflow-hidden rounded-2xl border bg-card shadow-sm",
 				dropTarget?.stage === column.stage && "border-primary",
 			)}
 			onDragLeave={(event) => {
@@ -253,7 +285,7 @@ function LeadColumn({
 				drop(dropTarget?.stage === column.stage ? dropTarget : atEnd);
 			}}
 		>
-			<header className="flex items-center gap-2 border-b px-3 py-2">
+			<header className="flex items-center gap-2 border-b bg-gradient-to-r from-primary/10 via-primary/5 to-transparent px-4 py-3">
 				<h3 className="font-medium text-sm">
 					{LEAD_BOARD.label[column.stage]}
 				</h3>
@@ -262,7 +294,7 @@ function LeadColumn({
 				</Badge>
 			</header>
 
-			<div className="flex min-h-24 flex-1 flex-col gap-2 overflow-y-auto p-2">
+			<div className="flex min-h-24 flex-1 flex-col gap-3 overflow-y-auto bg-muted/15 p-3">
 				{loaded.length === 0 ? (
 					<p className="p-4 text-center text-muted-foreground text-xs">
 						Nothing here yet.
@@ -404,8 +436,9 @@ function LeadCardView({
 			}}
 			role="button"
 			tabIndex={0}
+			className="rounded-xl border bg-card shadow-xs transition-[transform,box-shadow,border-color] duration-150 ease-out hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-md active:scale-[0.985]"
 		>
-			<CardContent className="flex flex-col gap-2">
+			<CardContent className="flex flex-col gap-3 rounded-xl border-0 p-4">
 				<div className="flex items-start justify-between gap-2">
 					<p className="truncate font-medium text-sm">{lead.name}</p>
 					{lead.entity ? (

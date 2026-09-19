@@ -6,12 +6,15 @@ import {
 	workspaceRoleOf,
 } from "@crm/auth";
 import type { Db } from "@crm/db";
+import { readReimbursementNotificationSettings } from "@crm/db/settings";
 import {
 	BadRequestException,
 	ForbiddenException,
 	Injectable,
+	Logger,
 	NotFoundException,
 } from "@nestjs/common";
+import { CommunicationsService } from "../communications/communications.service";
 import { InjectDatabase } from "../database/database.constants";
 import type {
 	ReviewReimbursementInput,
@@ -26,7 +29,12 @@ const profileInclude = {
 
 @Injectable()
 export class PeopleService {
-	constructor(@InjectDatabase() private readonly db: Db) {}
+	private readonly logger = new Logger(PeopleService.name);
+
+	constructor(
+		@InjectDatabase() private readonly db: Db,
+		private readonly communications: CommunicationsService,
+	) {}
 
 	async me(userId: string) {
 		const role = await workspaceRoleOf(userId, this.db);
@@ -106,7 +114,19 @@ export class PeopleService {
 			},
 			select: { id: true },
 		});
-		return this.reimbursement(row.id);
+		const reimbursement = await this.reimbursement(row.id);
+		await this.notifyReimbursement(reimbursement, userId).catch(
+			(cause: unknown) => {
+				this.logger.warn(
+					{
+						message: "Reimbursement notification email failed",
+						reimbursementId: row.id,
+					},
+					cause instanceof Error ? cause.stack : String(cause),
+				);
+			},
+		);
+		return reimbursement;
 	}
 
 	async review(input: ReviewReimbursementInput, userId: string) {
@@ -236,6 +256,48 @@ export class PeopleService {
 		if (!row)
 			throw new NotFoundException("That reimbursement no longer exists.");
 		return row;
+	}
+
+	private async notifyReimbursement(
+		reimbursement: Awaited<ReturnType<PeopleService["reimbursement"]>>,
+		userId: string,
+	) {
+		const [setting, employee] = await Promise.all([
+			readReimbursementNotificationSettings(this.db),
+			this.db.user.findUnique({
+				where: { id: userId },
+				select: {
+					employeeProfile: {
+						select: { manager: { select: { email: true } } },
+					},
+				},
+			}),
+		]);
+		const recipients = [...setting.additionalRecipients];
+		const managerEmail = employee?.employeeProfile?.manager?.email;
+		if (setting.notifyManager && managerEmail) recipients.push(managerEmail);
+		if (recipients.length === 0) return;
+
+		await this.communications.sendNotificationEmail(
+			userId,
+			recipients,
+			`Reimbursement submitted by ${reimbursement.employeeName}`,
+			[
+				`${reimbursement.employeeName} submitted a reimbursement request.`,
+				"",
+				`Expense: ${reimbursement.title}`,
+				`Amount: ${reimbursement.currency} ${reimbursement.amount}`,
+				`Expense date: ${reimbursement.expenseDate.toLocaleDateString("en-IN")}`,
+				reimbursement.description
+					? `Details: ${reimbursement.description}`
+					: null,
+				reimbursement.receiptUrl
+					? `Receipt: ${reimbursement.receiptUrl}`
+					: null,
+			]
+				.filter(Boolean)
+				.join("\n"),
+		);
 	}
 
 	private async assertCanManage(userId: string) {

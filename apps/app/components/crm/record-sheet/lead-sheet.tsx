@@ -1,7 +1,9 @@
 "use client";
 
 import Archive from "@carbon/icons-react/es/Archive";
+import { Badge } from "@crm/ui/components/badge";
 import { Button } from "@crm/ui/components/button";
+import { EmptyCellValue } from "@crm/ui/components/empty-cell";
 import { Icon } from "@crm/ui/components/icon";
 import { PersonAvatar } from "@crm/ui/components/person-avatar";
 import { Spinner } from "@crm/ui/components/spinner";
@@ -18,6 +20,8 @@ import {
 	DetailSheetProperties,
 	DetailSheetProperty,
 	DetailSheetSection,
+	DetailSheetStat,
+	DetailSheetStats,
 	type DetailSheetTab,
 } from "@/components/detail-sheet";
 import { LocalRelativeTime } from "@/components/local-date-time";
@@ -63,6 +67,9 @@ function useLeadMutations(leadId: string) {
 			queryKey: trpc.leads.column.pathKey(),
 		});
 		void queryClient.invalidateQueries({
+			queryKey: trpc.leads.list.pathKey(),
+		});
+		void queryClient.invalidateQueries({
 			queryKey: trpc.dashboard.leadOverview.queryKey(),
 		});
 	};
@@ -106,6 +113,9 @@ export function LeadSheet({ leadId }: { leadId: string }) {
 					}),
 					queryClient.invalidateQueries({
 						queryKey: trpc.leads.column.pathKey(),
+					}),
+					queryClient.invalidateQueries({
+						queryKey: trpc.leads.list.pathKey(),
 					}),
 					queryClient.invalidateQueries({
 						queryKey: trpc.dashboard.leadOverview.queryKey(),
@@ -181,6 +191,28 @@ export function LeadSheet({ leadId }: { leadId: string }) {
 			media={
 				lead ? <PersonAvatar name={lead.name} size="lg" src={null} /> : null
 			}
+			stats={
+				lead ? (
+					<DetailSheetStats>
+						<DetailSheetStat label="Status">
+							<Badge variant="secondary">{LEAD_BOARD.label[lead.stage]}</Badge>
+						</DetailSheetStat>
+						<DetailSheetStat label="Owner">
+							{lead.owner?.name ?? <EmptyCellValue />}
+						</DetailSheetStat>
+						<DetailSheetStat label="Last activity">
+							{lead.lastActivityAt ? (
+								<LocalRelativeTime date={lead.lastActivityAt} />
+							) : (
+								"No activity"
+							)}
+						</DetailSheetStat>
+						<DetailSheetStat label="Source">
+							{lead.source ?? <EmptyCellValue />}
+						</DetailSheetStat>
+					</DetailSheetStats>
+				) : null
+			}
 			onTabChange={setTab}
 			tab={tab}
 			tabs={tabs}
@@ -205,100 +237,108 @@ function LeadOverview({
 }) {
 	return (
 		<DetailSheetBody>
-			<DetailSheetSection title="Details">
-				<DetailSheetProperties>
-					<InlineSelectField
-						label="Stage"
-						onSave={(next) => onUpdate({ stage: next })}
-						options={STAGE_OPTIONS}
-						saving={saving}
-						value={lead.stage}
-					/>
+			<DetailSheetSection className="py-5" title="Pipeline">
+				<div className="rounded-2xl border bg-muted/20 p-4">
+					<DetailSheetProperties>
+						<InlineSelectField
+							label="Stage"
+							onSave={(next) => onUpdate({ stage: next })}
+							options={STAGE_OPTIONS}
+							saving={saving}
+							value={lead.stage}
+						/>
 
-					<InlineSelectField
-						label="Owner"
-						onSave={(next) => onAssign(next === UNSET ? null : next)}
-						options={ownerOptions}
-						saving={saving}
-						value={lead.owner?.id ?? UNSET}
-					/>
+						<InlineSelectField
+							label="Owner"
+							onSave={(next) => onAssign(next === UNSET ? null : next)}
+							options={ownerOptions}
+							saving={saving}
+							value={lead.owner?.id ?? UNSET}
+						/>
 
-					<InlineSelectField
-						label="Type"
-						onSave={(next) => onUpdate({ kind: next })}
-						options={KIND_OPTIONS}
-						saving={saving}
-						value={lead.kind}
-					/>
+						<InlineSelectField
+							label="Type"
+							onSave={(next) => onUpdate({ kind: next })}
+							options={KIND_OPTIONS}
+							saving={saving}
+							value={lead.kind}
+						/>
 
-					<InlineSelectField
-						label="Navirex entity"
-						onSave={(next) =>
-							onUpdate({ entity: next === UNSET ? undefined : next })
-						}
-						options={ENTITY_OPTIONS}
-						saving={saving}
-						value={lead.entity ?? UNSET}
-					/>
-
-					<InlineTextCell
-						label="Company"
-						onSave={(next) => onUpdate({ companyName: next })}
-						placeholder="Add a company"
-						saving={saving}
-						value={lead.companyName}
-					/>
-
-					<InlineTextCell
-						label="Email"
-						onSave={(next) => onUpdate({ email: next })}
-						placeholder="Add an email"
-						saving={saving}
-						value={lead.email}
-					/>
-
-					<InlineTextCell
-						label="Phone"
-						onSave={(next) => onUpdate({ phone: next })}
-						placeholder="Add a phone number"
-						saving={saving}
-						value={lead.phone}
-					/>
-
-					<InlineTextCell
-						label="Country"
-						onSave={(next) => onUpdate({ country: next })}
-						placeholder="Add a country"
-						saving={saving}
-						value={lead.country}
-					/>
-
-					<InlineTextCell
-						label="Source"
-						onSave={(next) => onUpdate({ source: next })}
-						placeholder="Add a source"
-						saving={saving}
-						value={lead.source}
-					/>
-
-					<DetailSheetProperty label="In this stage since">
-						<LocalRelativeTime date={lead.stageChangedAt} />
-					</DetailSheetProperty>
-
-					<DetailSheetProperty label="Created">
-						<LocalRelativeTime date={lead.createdAt} />
-					</DetailSheetProperty>
-				</DetailSheetProperties>
+						<InlineSelectField
+							label="Navirex entity"
+							onSave={(next) =>
+								onUpdate({ entity: next === UNSET ? undefined : next })
+							}
+							options={ENTITY_OPTIONS}
+							saving={saving}
+							value={lead.entity ?? UNSET}
+						/>
+						<DetailSheetProperty label="In this stage since">
+							<LocalRelativeTime date={lead.stageChangedAt} />
+						</DetailSheetProperty>
+						<DetailSheetProperty label="Created">
+							<LocalRelativeTime date={lead.createdAt} />
+						</DetailSheetProperty>
+					</DetailSheetProperties>
+				</div>
 			</DetailSheetSection>
 
-			<DetailSheetSection title="Notes">
-				<InlineTextArea
-					label="Notes"
-					onSave={(next) => onUpdate({ notes: next })}
-					placeholder="What matters about this lead?"
-					saving={saving}
-					value={lead.notes}
-				/>
+			<DetailSheetSection className="py-5" title="Contact details">
+				<div className="rounded-2xl border bg-card p-4 shadow-xs">
+					<DetailSheetProperties>
+						<InlineTextCell
+							label="Company"
+							onSave={(next) => onUpdate({ companyName: next })}
+							placeholder="Add a company"
+							saving={saving}
+							value={lead.companyName}
+						/>
+
+						<InlineTextCell
+							label="Email"
+							onSave={(next) => onUpdate({ email: next })}
+							placeholder="Add an email"
+							saving={saving}
+							value={lead.email}
+						/>
+
+						<InlineTextCell
+							label="Phone"
+							onSave={(next) => onUpdate({ phone: next })}
+							placeholder="Add a phone number"
+							saving={saving}
+							value={lead.phone}
+						/>
+
+						<InlineTextCell
+							label="Country"
+							onSave={(next) => onUpdate({ country: next })}
+							placeholder="Add a country"
+							saving={saving}
+							value={lead.country}
+						/>
+
+						<InlineTextCell
+							label="Source"
+							onSave={(next) => onUpdate({ source: next })}
+							placeholder="Add a source"
+							saving={saving}
+							value={lead.source}
+						/>
+					</DetailSheetProperties>
+				</div>
+			</DetailSheetSection>
+
+			<DetailSheetSection className="py-5" title="Notes">
+				<div className="rounded-2xl border bg-amber-50/50 p-3 dark:bg-amber-950/10">
+					<InlineTextArea
+						label="Notes"
+						onSave={(next) => onUpdate({ notes: next })}
+						placeholder="What matters about this lead?"
+						saving={saving}
+						value={lead.notes}
+					/>
+				</div>
 			</DetailSheetSection>
 		</DetailSheetBody>
 	);

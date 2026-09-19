@@ -10,6 +10,8 @@ import {
 	LEAD_STAGES,
 	type LeadCreateInput,
 	type LeadIntakeInput,
+	type LeadListInput,
+	type LeadListOutput,
 	type LeadMoveInput,
 	type LeadUpdateInput,
 	type ZohoLeadRow,
@@ -128,6 +130,30 @@ export class LeadsService {
 				leads.length < LEADS.board.columnLimit
 					? null
 					: (last?.position ?? null),
+		};
+	}
+
+	async list(input: LeadListInput, userId: string): Promise<LeadListOutput> {
+		const where = this.where(input, userId);
+		const pageSize = 50;
+		const [total, rows] = await Promise.all([
+			this.db.lead.count({ where }),
+			this.db.lead.findMany({
+				where,
+				select: cardSelect,
+				orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+				take: pageSize + 1,
+				cursor: input.cursor ? { id: input.cursor } : undefined,
+				skip: input.cursor ? 1 : undefined,
+			}),
+		]);
+		const hasMore = rows.length > pageSize;
+		const leads = hasMore ? rows.slice(0, pageSize) : rows;
+
+		return {
+			leads,
+			total,
+			nextCursor: hasMore ? (leads.at(-1)?.id ?? null) : null,
 		};
 	}
 

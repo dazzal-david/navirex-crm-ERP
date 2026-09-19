@@ -325,6 +325,40 @@ export class CommunicationsService {
 		return { provider, messageId };
 	}
 
+	async sendNotificationEmail(
+		userId: string,
+		recipients: string[],
+		subject: string,
+		body: string,
+	): Promise<void> {
+		const uniqueRecipients = [
+			...new Set(recipients.map((email) => email.toLowerCase())),
+		];
+		if (uniqueRecipients.length === 0) return;
+
+		const status = await this.status(userId);
+		if (this.graphMail.configured || status.email.microsoft) {
+			await Promise.all(
+				uniqueRecipients.map((to) =>
+					this.sendMicrosoft(userId, to, subject, body),
+				),
+			);
+			return;
+		}
+		if (status.email.google) {
+			await Promise.all(
+				uniqueRecipients.map((to) =>
+					this.sendGoogle(userId, to, subject, body),
+				),
+			);
+			return;
+		}
+
+		throw new BadRequestException(
+			"Connect Google or Microsoft email before enabling reimbursement notifications.",
+		);
+	}
+
 	async sendWhatsApp(
 		input: {
 			leadId: string;

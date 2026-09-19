@@ -44,6 +44,20 @@ export const archiveRetentionOutput = z.object({
 
 export type ArchiveRetentionSettings = z.infer<typeof archiveRetentionOutput>;
 
+export const reimbursementNotificationsOutput = z.object({
+	notifyManager: z.boolean(),
+	additionalRecipients: z.array(z.email()),
+});
+
+export const setReimbursementNotificationsInput = z.object({
+	notifyManager: z.boolean(),
+	additionalRecipients: z.array(z.email().max(320)).max(20),
+});
+
+export type ReimbursementNotificationSettings = z.infer<
+	typeof reimbursementNotificationsOutput
+>;
+
 export const setAgentModelInput = z.object({
 	modelId: z.string().trim().min(1).max(200).nullable(),
 });

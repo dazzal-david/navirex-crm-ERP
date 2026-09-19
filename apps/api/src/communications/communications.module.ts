@@ -17,5 +17,6 @@ import { WhatsAppWebhookService } from "./whatsapp-webhook.service";
 		CommunicationsRouter,
 		WhatsAppWebhookService,
 	],
+	exports: [CommunicationsService],
 })
 export class CommunicationsModule {}

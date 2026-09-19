@@ -154,6 +154,51 @@ export async function writeArchiveRetentionDays(
 	return archiveRetentionDays;
 }
 
+export interface ReimbursementNotificationSetting {
+	notifyManager: boolean;
+	additionalRecipients: string[];
+}
+
+export async function readReimbursementNotificationSettings(
+	db: Db,
+): Promise<ReimbursementNotificationSetting> {
+	const row = await db.appSetting.findUnique({
+		where: { id: SETTINGS_ID },
+		select: {
+			reimbursementNotifyManager: true,
+			reimbursementNotificationEmails: true,
+		},
+	});
+
+	return {
+		notifyManager: row?.reimbursementNotifyManager ?? true,
+		additionalRecipients: row?.reimbursementNotificationEmails ?? [],
+	};
+}
+
+export async function writeReimbursementNotificationSettings(
+	db: Db,
+	setting: ReimbursementNotificationSetting,
+): Promise<ReimbursementNotificationSetting> {
+	const additionalRecipients = [
+		...new Set(
+			setting.additionalRecipients.map((email) => email.trim().toLowerCase()),
+		),
+	].filter(Boolean);
+	const fields = {
+		reimbursementNotifyManager: setting.notifyManager,
+		reimbursementNotificationEmails: additionalRecipients,
+	};
+
+	await db.appSetting.upsert({
+		where: { id: SETTINGS_ID },
+		create: { id: SETTINGS_ID, ...fields },
+		update: fields,
+	});
+
+	return { notifyManager: setting.notifyManager, additionalRecipients };
+}
+
 export function maskKey(key: string): string {
 	const trimmed = key.trim();
 	return trimmed.length > 4 ? `••••${trimmed.slice(-4)}` : "••••";

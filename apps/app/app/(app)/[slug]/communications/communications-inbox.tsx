@@ -3,6 +3,7 @@
 import Chat from "@carbon/icons-react/es/Chat";
 import Email from "@carbon/icons-react/es/Email";
 import Notes from "@carbon/icons-react/es/Notebook";
+import UserProfile from "@carbon/icons-react/es/UserProfile";
 import { Bubble, BubbleContent } from "@crm/ui/components/bubble";
 import { Button } from "@crm/ui/components/button";
 import { Icon } from "@crm/ui/components/icon";
@@ -33,12 +34,14 @@ import { Textarea } from "@crm/ui/components/textarea";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { toast } from "sonner";
+import { useOpenRecord } from "@/components/crm/record-sheet/record-stack";
 import { useTRPC } from "@/lib/trpc/client";
 
 type Channel = "note" | "email" | "whatsapp";
 
 export function CommunicationsInbox() {
 	const trpc = useTRPC();
+	const openRecord = useOpenRecord();
 	const queryClient = useQueryClient();
 	const conversations = useQuery({
 		...trpc.communications.conversations.queryOptions(),
@@ -141,14 +144,24 @@ export function CommunicationsInbox() {
 			<section className="flex min-h-0 min-w-0 flex-col">
 				{active ? (
 					<>
-						<header className="border-b px-4 py-3">
-							<p className="font-medium">{active.name}</p>
-							<p className="text-muted-foreground text-xs">
-								{active.companyName ??
-									active.email ??
-									active.phone ??
-									active.stage}
-							</p>
+						<header className="flex items-center justify-between gap-4 border-b bg-gradient-to-r from-primary/8 to-transparent px-4 py-3">
+							<div className="min-w-0">
+								<p className="truncate font-medium">{active.name}</p>
+								<p className="truncate text-muted-foreground text-xs">
+									{active.companyName ??
+										active.email ??
+										active.phone ??
+										active.stage}
+								</p>
+							</div>
+							<Button
+								onClick={() => openRecord({ kind: "lead", id: active.id })}
+								size="sm"
+								variant="outline"
+							>
+								<Icon icon={UserProfile} data-icon="inline-start" />
+								Open profile
+							</Button>
 						</header>
 						<MessageScrollerProvider autoScroll defaultScrollPosition="end">
 							<MessageScroller className="flex-1">

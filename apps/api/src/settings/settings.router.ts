@@ -7,9 +7,11 @@ import {
 	agentModelOutput,
 	archiveRetentionOutput,
 	modelCatalogOutput,
+	reimbursementNotificationsOutput,
 	researchKeyOutput,
 	setAgentModelInput,
 	setArchiveRetentionDaysInput,
+	setReimbursementNotificationsInput,
 	setResearchKeyInput,
 } from "./settings.contracts";
 import { SettingsService } from "./settings.service";
@@ -80,5 +82,28 @@ export class SettingsRouter {
 		@Input() input: z.infer<typeof setArchiveRetentionDaysInput>,
 	) {
 		return this.settings.setArchiveRetention(input.days);
+	}
+
+	@Query({
+		output: reimbursementNotificationsOutput,
+		meta: restMeta("GET", "/settings/reimbursement-notifications", [
+			"Settings",
+		]),
+	})
+	async reimbursementNotifications() {
+		return this.settings.reimbursementNotifications();
+	}
+
+	@Mutation({
+		input: setReimbursementNotificationsInput,
+		output: reimbursementNotificationsOutput,
+		meta: restMeta("PATCH", "/settings/reimbursement-notifications", [
+			"Settings",
+		]),
+	})
+	async setReimbursementNotifications(
+		@Input() input: z.infer<typeof setReimbursementNotificationsInput>,
+	) {
+		return this.settings.setReimbursementNotifications(input);
 	}
 }

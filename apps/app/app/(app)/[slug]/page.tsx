@@ -24,7 +24,7 @@ import { loadOverviewSearchParams } from "./overview-search-params";
 export default function OverviewPage({ searchParams }: PageProps<"/[slug]">) {
 	return (
 		<PageShell>
-			<PageShellHeader>
+			<PageShellHeader className="rounded-[1.75rem] border bg-gradient-to-br from-emerald-50 via-background to-sky-50 p-6 shadow-sm dark:from-emerald-950/30 dark:to-sky-950/20 md:p-8">
 				<PageShellHeading>
 					<Suspense fallback={<OverviewGreetingFallback />}>
 						<Greeting />

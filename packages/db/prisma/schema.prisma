@@ -1520,6 +1520,9 @@ model AppSetting {
 
   archiveRetentionDays Int @default(180)
 
+  reimbursementNotifyManager Boolean @default(true)
+  reimbursementNotificationEmails String[] @default([])
+
   trackingSiteId           String? @unique
   trackingCrossDomain      Boolean @default(true)
   trackingLimitToDomains   Boolean @default(true)

@@ -26,7 +26,7 @@ export default function LeadsPage({
 }: PageProps<"/[slug]/leads">) {
 	return (
 		<PageShell className="min-h-0">
-			<PageShellHeader>
+			<PageShellHeader className="rounded-[1.75rem] border bg-gradient-to-br from-emerald-50 via-background to-amber-50 p-6 shadow-sm dark:from-emerald-950/30 dark:to-amber-950/20 md:p-8">
 				<PageShellHeading>
 					<PageShellTitle>Leads</PageShellTitle>
 					<PageShellDescription>

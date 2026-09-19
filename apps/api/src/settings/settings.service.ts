@@ -5,9 +5,11 @@ import {
 	readAgentModel,
 	readArchiveRetentionDays,
 	readContextDevKey,
+	readReimbursementNotificationSettings,
 	writeAgentModel,
 	writeArchiveRetentionDays,
 	writeContextDevKey,
+	writeReimbursementNotificationSettings,
 } from "@crm/db/settings";
 import { BadRequestException, Injectable, Logger } from "@nestjs/common";
 import { ResearchKeyService } from "../agent/research-key.service";
@@ -18,6 +20,7 @@ import type {
 	AgentModelSettings,
 	ArchiveRetentionSettings,
 	ModelCatalogResult,
+	ReimbursementNotificationSettings,
 	ResearchKeySettings,
 } from "./settings.contracts";
 
@@ -143,5 +146,21 @@ export class SettingsService {
 		});
 
 		return { days: saved };
+	}
+
+	async reimbursementNotifications(): Promise<ReimbursementNotificationSettings> {
+		return readReimbursementNotificationSettings(this.db);
+	}
+
+	async setReimbursementNotifications(
+		input: ReimbursementNotificationSettings,
+	): Promise<ReimbursementNotificationSettings> {
+		const saved = await writeReimbursementNotificationSettings(this.db, input);
+		this.logger.log({
+			message: "Reimbursement notification settings changed",
+			notifyManager: saved.notifyManager,
+			recipientCount: saved.additionalRecipients.length,
+		});
+		return saved;
 	}
 }

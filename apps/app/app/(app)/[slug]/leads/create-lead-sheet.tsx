@@ -49,6 +49,9 @@ export function CreateLeadSheet() {
 						queryKey: trpc.leads.column.pathKey(),
 					}),
 					queryClient.invalidateQueries({
+						queryKey: trpc.leads.list.pathKey(),
+					}),
+					queryClient.invalidateQueries({
 						queryKey: trpc.dashboard.leadOverview.queryKey(),
 					}),
 				]);

@@ -27,11 +27,11 @@ import { enrichmentQueueInput } from "@crm/validation/enrichment-queue";
 import { fieldListInput, fieldListOutput, fieldByKeyInput, serializedFieldOutput, fieldEntityInput, fieldFiltersOutput, fieldIdInput, fieldCoverageOutput, fieldCreateInput, fieldUpdateArgs, fieldReorderInput, fieldReorderOutput, fieldDeleteOutput, fieldBackfillOutput } from "../fields/fields.contracts";
 import { googleConnectionStatusOutput, setAutoCreateInput, suppressDomainInput, suppressDomainOutput, threadInput, emailThreadOutput, calendarEventInput, calendarEventOutput } from "../google/google.contracts";
 import { purgeSyncedDataOutput, revokeAccessOutput, microsoftConnectionStatusOutput, setOutlookAutoCreateInput } from "../microsoft/microsoft.contracts";
-import { boardInput, boardOutput, columnPageInput, columnPageOutput, leadIdInput, leadDetailOutput, leadOwnersOutput, leadCreateInput, leadMutateOutput, leadIntakeInput, leadIntakeOutput, zohoImportInput, zohoImportOutput, leadUpdateInput, leadMoveInput, leadAssignInput, leadDeleteOutput } from "../leads/leads.contracts";
+import { boardInput, boardOutput, columnPageInput, columnPageOutput, leadListInput, leadListOutput, leadIdInput, leadDetailOutput, leadOwnersOutput, leadCreateInput, leadMutateOutput, leadIntakeInput, leadIntakeOutput, zohoImportInput, zohoImportOutput, leadUpdateInput, leadMoveInput, leadAssignInput, leadDeleteOutput } from "../leads/leads.contracts";
 import { metaStatusOutput, metaAvailablePagesOutput, metaPageInput, metaMutationOutput, metaSyncOutput } from "../meta/meta.contracts";
 import { employeePortalOutput, directoryOutput, updateMyProfileInput, employeeProfileOutput, updateEmployeeInput, reimbursementsOutput, submitReimbursementInput, reimbursementOutput, reviewReimbursementInput, reimbursementIdInput } from "../people/people.contracts";
 import { savedViewListInput, savedViewListOutput, savedViewCreateInput, savedViewOutput, savedViewUpdateArgs, savedViewIdInput, savedViewDeleteOutput } from "../saved-views/saved-views.contracts";
-import { agentModelOutput, modelCatalogOutput, setAgentModelInput, researchKeyOutput, setResearchKeyInput, archiveRetentionOutput, setArchiveRetentionDaysInput } from "../settings/settings.contracts";
+import { agentModelOutput, modelCatalogOutput, setAgentModelInput, researchKeyOutput, setResearchKeyInput, archiveRetentionOutput, setArchiveRetentionDaysInput, reimbursementNotificationsOutput, setReimbursementNotificationsInput } from "../settings/settings.contracts";
 import { slackStatusOutput, slackMatchesOutput, slackChannelsInput, slackChannelsOutput, slackJoinChannelInput, slackJoinChannelOutput, slackRefreshPeopleOutput, slackCreateChannelInput, slackCreateChannelOutput, slackDisconnectOutput } from "../slack/slack.contracts";
 import { ssoSignInOptionsOutput, ssoSettingsOutput, ssoProviderListInput, ssoProviderListOutput, registerSsoProviderInput, ssoProviderOutput, deleteSsoProviderInput, deleteSsoProviderOutput } from "../sso/sso.contracts";
 import { templatesOutput, templateCreateInput, templateOutput, templateUpdateInput } from "../templates/templates.contracts";
@@ -601,6 +601,10 @@ const appRouter = t.router({
       .input(columnPageInput)
       .output(columnPageOutput)
       .query(async () => "PLACEHOLDER_DO_NOT_REMOVE" as any),
+    list: publicProcedure
+      .input(leadListInput)
+      .output(leadListOutput)
+      .query(async () => "PLACEHOLDER_DO_NOT_REMOVE" as any),
     byId: publicProcedure
       .input(leadIdInput)
       .output(leadDetailOutput)
@@ -765,6 +769,13 @@ const appRouter = t.router({
     setArchiveRetention: publicProcedure
       .input(setArchiveRetentionDaysInput)
       .output(archiveRetentionOutput)
+      .mutation(async () => "PLACEHOLDER_DO_NOT_REMOVE" as any),
+    reimbursementNotifications: publicProcedure
+      .output(reimbursementNotificationsOutput)
+      .query(async () => "PLACEHOLDER_DO_NOT_REMOVE" as any),
+    setReimbursementNotifications: publicProcedure
+      .input(setReimbursementNotificationsInput)
+      .output(reimbursementNotificationsOutput)
       .mutation(async () => "PLACEHOLDER_DO_NOT_REMOVE" as any)
     }),
   slack: t.router({
