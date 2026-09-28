@@ -354,7 +354,7 @@ export const auth = betterAuth({
 				before: async (session) => {
 					const workspaceId = await ensureWorkspaceMembership(
 						session.userId,
-					).catch((error: unknown) => {
+					).catch((error: Error) => {
 						if (error instanceof NotInvitedError) {
 							throw new APIError("FORBIDDEN", { message: error.message });
 						}

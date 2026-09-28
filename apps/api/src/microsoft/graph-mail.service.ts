@@ -4,6 +4,7 @@ import {
 	Injectable,
 } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
+import { z } from "zod";
 import type { EnvironmentVariables } from "../config/env.validation";
 
 type GraphMailConfig = {
@@ -17,6 +18,16 @@ type CachedToken = {
 	value: string;
 	expiresAt: number;
 };
+
+const graphError = z.object({
+	error: z
+		.union([
+			z.string().transform(() => undefined),
+			z.object({ message: z.string().optional() }),
+		])
+		.optional(),
+	error_description: z.string().optional(),
+});
 
 @Injectable()
 export class GraphMailService {
@@ -147,14 +158,11 @@ export class GraphMailService {
 		fallback: string,
 	): Promise<string> {
 		try {
-			const result = (await response.json()) as {
-				error?: string | { message?: string };
-				error_description?: string;
-			};
-			if (typeof result.error === "object" && result.error?.message) {
-				return result.error.message;
-			}
-			return result.error_description ?? fallback;
+			const result = graphError.safeParse(await response.json());
+			if (!result.success) return fallback;
+			const { error, error_description } = result.data;
+			if (error && "message" in error && error.message) return error.message;
+			return error_description ?? fallback;
 		} catch {
 			return `${fallback} (HTTP ${response.status}).`;
 		}

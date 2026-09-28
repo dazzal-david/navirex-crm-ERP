@@ -33,7 +33,7 @@ const tables = Object.fromEntries(
 	Object.entries(files).map(([name, file]) => [name, readCsv(file)]),
 ) as Record<keyof typeof files, CsvRow[]>;
 
-const required: Record<keyof typeof files, string[]> = {
+const required = {
 	accounts: ["Record Id", "Account Name"],
 	contacts: ["Record Id", "Contact Name"],
 	deals: ["Record Id", "Deal Name", "Account Name.id"],
@@ -42,7 +42,7 @@ const required: Record<keyof typeof files, string[]> = {
 	calls: ["Record Id", "Subject"],
 	tasks: ["Record Id", "Subject"],
 	users: ["Record Id", "Email"],
-};
+} satisfies Record<keyof typeof files, string[]>;
 
 for (const [name, columns] of Object.entries(required)) {
 	const rows = tables[name as keyof typeof tables];

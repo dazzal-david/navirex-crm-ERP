@@ -20,7 +20,7 @@ export class NotInvitedError extends Error {
 	}
 }
 
-export function newInviteToken(): { token: string; id: string } {
+export function newInviteToken() {
 	const token = randomBytes(INVITES.tokenBytes).toString("base64url");
 	return { token, id: inviteIdOf(token) };
 }

@@ -17,19 +17,21 @@ const PASSWORD = "correct-horse-battery";
 let inviterId: string;
 let caller = 0;
 
-const signUp = (email: string, token?: string) =>
-	auth.handler(
+const signUp = (email: string, token?: string) => {
+	const headers = new Headers({
+		"content-type": "application/json",
+		origin: env.apiUrl,
+		"x-forwarded-for": `10.0.0.${++caller}`,
+	});
+	if (token) headers.set(INVITES.header, token);
+	return auth.handler(
 		new Request(new URL("/api/auth/sign-up/email", env.apiUrl), {
 			method: "POST",
-			headers: {
-				"content-type": "application/json",
-				origin: env.apiUrl,
-				"x-forwarded-for": `10.0.0.${++caller}`,
-				...(token ? { [INVITES.header]: token } : {}),
-			},
+			headers,
 			body: JSON.stringify({ email, password: PASSWORD, name: email }),
 		}),
 	);
+};
 
 const invite = async (label: string, role = "member") => {
 	const { token, id } = newInviteToken();

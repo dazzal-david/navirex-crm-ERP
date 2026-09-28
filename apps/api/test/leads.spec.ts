@@ -42,7 +42,10 @@ beforeAll(async () => {
 
 afterAll(async () => {
 	await db.agentTask.deleteMany({
-		where: { kind: "agent-event", reason: "lead.created" },
+		where: {
+			kind: "agent-event",
+			reason: { in: ["lead.created", "company.created", "contact.created"] },
+		},
 	});
 	await db.activity.deleteMany({ where: { createdById: userId } });
 	await db.lead.deleteMany({

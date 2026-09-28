@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
+import { z } from "zod";
 import { AuthHeading, AuthShell } from "@/components/auth-shell";
 import { API_URL } from "@/lib/env";
 import { InviteSignUp } from "./invite-sign-up";
@@ -8,7 +9,12 @@ export const metadata: Metadata = {
 	title: "Accept invitation",
 };
 
-type Invitation = { email: string; workspace: string };
+const invitationBody = z.object({
+	email: z.string(),
+	workspace: z.string().default("Navirex"),
+});
+
+type Invitation = z.infer<typeof invitationBody>;
 
 type InviteParams = { params: Promise<{ token: string }> };
 
@@ -19,9 +25,8 @@ async function readInvitation(token: string): Promise<Invitation | null> {
 			{ cache: "no-store" },
 		);
 		if (!response.ok) return null;
-		const body = (await response.json()) as Partial<Invitation>;
-		if (typeof body.email !== "string") return null;
-		return { email: body.email, workspace: body.workspace ?? "Navirex" };
+		const body = invitationBody.safeParse(await response.json());
+		return body.success ? body.data : null;
 	} catch (error) {
 		console.error("Invite: could not read the invitation.", error);
 		return null;

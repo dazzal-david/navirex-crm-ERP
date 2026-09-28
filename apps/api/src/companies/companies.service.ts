@@ -791,6 +791,19 @@ export class CompaniesService {
 	}
 }
 
+type AccountData = {
+	accountType?: LeadKind | null;
+	state?: string | null;
+	address?: string | null;
+	operatingRegions?: string | null;
+	installationType?: string | null;
+	portalStatus?: EpcPortalStatus;
+	onboardedAt?: Date | null;
+	portalSubmissions?: number;
+	customersReferred?: number;
+	notes?: string | null;
+};
+
 function accountData(
 	input: Pick<
 		CompanyUpdateInput,
@@ -806,18 +819,7 @@ function accountData(
 		| "notes"
 	>,
 ) {
-	const data: {
-		accountType?: LeadKind | null;
-		state?: string | null;
-		address?: string | null;
-		operatingRegions?: string | null;
-		installationType?: string | null;
-		portalStatus?: EpcPortalStatus;
-		onboardedAt?: Date | null;
-		portalSubmissions?: number;
-		customersReferred?: number;
-		notes?: string | null;
-	} = {};
+	const data: AccountData = {};
 	if (input.accountType !== undefined) data.accountType = input.accountType;
 	if (input.state !== undefined) data.state = blankToNull(input.state);
 	if (input.address !== undefined) data.address = blankToNull(input.address);
