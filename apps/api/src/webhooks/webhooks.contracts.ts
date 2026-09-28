@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { leadKind } from "../leads/leads.contracts";
 
 export const inboundLeadPayload = z
 	.object({
@@ -10,6 +11,7 @@ export const inboundLeadPayload = z
 		source: z.string().trim().max(120).optional(),
 		externalId: z.string().trim().max(200).optional(),
 		channel: z.enum(["email", "whatsapp", "webhook"]).default("webhook"),
+		kind: leadKind.optional(),
 	})
 	.refine((lead) => Boolean(lead.email || lead.phone), {
 		message: "An email address or phone number is required.",

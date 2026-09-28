@@ -9,20 +9,22 @@ import { toast } from "sonner";
 import { useTRPC } from "@/lib/trpc/client";
 
 const STAGES = new Set([
-	"UNASSIGNED",
-	"ASSIGNED",
-	"TALKING",
+	"NOT_CONTACTED",
+	"CONTACTED",
 	"INTERESTED",
-	"REJECTED",
-	"APPROVED",
+	"FOLLOW_UP",
+	"ONBOARDED",
+	"NOT_INTERESTED",
+	"NOT_QUALIFIED",
 ] as const);
 type Stage =
-	| "UNASSIGNED"
-	| "ASSIGNED"
-	| "TALKING"
+	| "NOT_CONTACTED"
+	| "CONTACTED"
 	| "INTERESTED"
-	| "REJECTED"
-	| "APPROVED";
+	| "FOLLOW_UP"
+	| "ONBOARDED"
+	| "NOT_INTERESTED"
+	| "NOT_QUALIFIED";
 type ZohoRow = {
 	zohoId: string;
 	name: string;
@@ -168,10 +170,13 @@ function parseZoho(input: string): ZohoRow[] {
 function stageOf(value: string): Stage | undefined {
 	const normalized = normalize(value).replaceAll(" ", "_").toUpperCase();
 	if (STAGES.has(normalized as Stage)) return normalized as Stage;
+	if (/not qualif|unqualif|junk/.test(normalize(value))) return "NOT_QUALIFIED";
+	if (/lost|reject|not interest/.test(normalize(value)))
+		return "NOT_INTERESTED";
+	if (/convert|won|approve|onboard/.test(normalize(value))) return "ONBOARDED";
+	if (/follow|future/.test(normalize(value))) return "FOLLOW_UP";
 	if (/qualif|interest|hot/.test(normalize(value))) return "INTERESTED";
-	if (/contact|follow|talk/.test(normalize(value))) return "TALKING";
-	if (/convert|won|approve/.test(normalize(value))) return "APPROVED";
-	if (/lost|reject|junk|unqualif/.test(normalize(value))) return "REJECTED";
+	if (/contact|talk|attempt/.test(normalize(value))) return "CONTACTED";
 	return undefined;
 }
 

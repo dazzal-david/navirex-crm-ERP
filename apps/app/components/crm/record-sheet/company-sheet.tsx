@@ -29,8 +29,10 @@ import { EnrichmentActions } from "@/components/crm/enrichment-actions";
 import { EnrichmentIndicator } from "@/components/crm/enrichment-status";
 import { FieldsCog, RecordFields } from "@/components/crm/fields/record-fields";
 import {
+	InlineDateField,
 	InlineField,
 	InlineSelectField,
+	InlineTextArea,
 	savingValue,
 } from "@/components/crm/inline-field";
 import { OwnerCell } from "@/components/crm/owner-cell";
@@ -44,6 +46,7 @@ import {
 	DetailSheetMain,
 	DetailSheetPending,
 	DetailSheetProperties,
+	DetailSheetProperty,
 	DetailSheetProse,
 	DetailSheetRail,
 	DetailSheetSection,
@@ -52,9 +55,10 @@ import {
 	DetailSheetStats,
 	type DetailSheetTab,
 } from "@/components/detail-sheet";
-import { LocalDay } from "@/components/local-date-time";
+import { LocalDateTime, LocalDay } from "@/components/local-date-time";
 import { OPEN_STAGES } from "@/lib/deal-stage";
 import { ENRICHMENT_POLL_MS, isEnriching } from "@/lib/enrichment-status";
+import { LEAD_BOARD } from "@/lib/leads/board-config";
 import { savingField } from "@/lib/pending-field";
 import { hasCompanyLinks } from "@/lib/social-links";
 import { useCrmCache } from "@/lib/trpc/cache";
@@ -75,6 +79,30 @@ type Company = RouterOutputs["companies"]["byId"];
 type CompanyDeal = Company["deals"][number];
 
 const UNASSIGNED = "unassigned";
+const NONE = "none";
+
+const ACCOUNT_TYPE_OPTIONS = [
+	{ value: NONE, label: "Not set" },
+	...LEAD_BOARD.kinds.map((kind) => ({
+		value: kind,
+		label: LEAD_BOARD.kind[kind],
+	})),
+];
+
+const PORTAL_STATUS_OPTIONS = (["NOT_REGISTERED", "REGISTERED"] as const).map(
+	(status) => ({ value: status, label: LEAD_BOARD.portalStatus[status] }),
+);
+
+const CONVERTED_FORMAT: Intl.DateTimeFormatOptions = {
+	dateStyle: "medium",
+	timeStyle: "short",
+};
+
+function wholeNumber(value: string): number | null {
+	if (value === "") return 0;
+	const parsed = Number(value);
+	return Number.isInteger(parsed) && parsed >= 0 ? parsed : null;
+}
 
 function pendingFields(company: Company): string[] {
 	const missing: string[] = [];
@@ -313,6 +341,24 @@ function CompanyOverview({ company }: { company: Company }) {
 	const save = (data: Record<string, string | null>) =>
 		update.mutate({ id: company.id, data });
 
+	const saveCount = (
+		key: "portalSubmissions" | "customersReferred",
+		value: string,
+	) => {
+		const count = wholeNumber(value);
+		if (count === null) {
+			toast.error("Enter a whole number, 0 or more.");
+			return;
+		}
+		update.mutate({ id: company.id, data: { [key]: count } });
+	};
+
+	const contactName = company.primaryContact
+		? [company.primaryContact.firstName, company.primaryContact.lastName]
+				.filter(Boolean)
+				.join(" ")
+		: null;
+
 	const saveFields = (fields: Record<string, FieldValueJson>) =>
 		update.mutate({ id: company.id, data: { fields } });
 
@@ -339,7 +385,7 @@ function CompanyOverview({ company }: { company: Company }) {
 					>
 						<DetailSheetProperties columns={1}>
 							<InlineField
-								label="Name"
+								label="Account name"
 								value={company.name}
 								saving={isSaving("name")}
 								onSave={(name) => name && save({ name })}
@@ -375,19 +421,31 @@ function CompanyOverview({ company }: { company: Company }) {
 								onSave={(email) => save({ email })}
 							/>
 							<InlineField
+								label="Country"
+								value={company.country}
+								saving={isSaving("country")}
+								onSave={(country) => save({ country })}
+							/>
+							<InlineField
+								label="State"
+								value={company.state}
+								saving={isSaving("state")}
+								onSave={(state) => save({ state })}
+							/>
+							<InlineField
 								label="City"
 								value={company.city}
 								saving={isSaving("city")}
 								onSave={(city) => save({ city })}
 							/>
 							<InlineField
-								label="Country"
-								value={company.country}
-								saving={isSaving("country")}
-								onSave={(country) => save({ country })}
+								label="Address"
+								value={company.address}
+								saving={isSaving("address")}
+								onSave={(address) => save({ address })}
 							/>
 							<InlineSelectField
-								label="Owner"
+								label="Account owner"
 								value={company.owner?.id ?? UNASSIGNED}
 								options={[
 									{ value: UNASSIGNED, label: "Unassigned" },
@@ -406,6 +464,97 @@ function CompanyOverview({ company }: { company: Company }) {
 								onSave={saveFields}
 							/>
 						</DetailSheetProperties>
+					</DetailSheetSection>
+
+					<DetailSheetSection title="Account">
+						<DetailSheetProperties columns={1}>
+							<InlineSelectField
+								label="Account type"
+								value={company.accountType ?? NONE}
+								options={ACCOUNT_TYPE_OPTIONS}
+								saving={isSaving("accountType")}
+								onSave={(next) =>
+									update.mutate({
+										id: company.id,
+										data: {
+											accountType:
+												next === NONE
+													? null
+													: (next as (typeof LEAD_BOARD.kinds)[number]),
+										},
+									})
+								}
+							/>
+							<DetailSheetProperty label="Contact name">
+								{contactName ?? <EmptyCellValue />}
+							</DetailSheetProperty>
+							<InlineField
+								label="Operating regions"
+								value={company.operatingRegions}
+								saving={isSaving("operatingRegions")}
+								onSave={(operatingRegions) => save({ operatingRegions })}
+							/>
+							<InlineField
+								label="Installation type"
+								value={company.installationType}
+								saving={isSaving("installationType")}
+								onSave={(installationType) => save({ installationType })}
+							/>
+							<InlineSelectField
+								label="EPC portal status"
+								value={company.portalStatus}
+								options={PORTAL_STATUS_OPTIONS}
+								saving={isSaving("portalStatus")}
+								onSave={(next) =>
+									update.mutate({
+										id: company.id,
+										data: {
+											portalStatus: next as "NOT_REGISTERED" | "REGISTERED",
+										},
+									})
+								}
+							/>
+							<InlineDateField
+								label="Onboarding date"
+								value={company.onboardedAt}
+								saving={isSaving("onboardedAt")}
+								onSave={(onboardedAt) =>
+									save({ onboardedAt: onboardedAt || null })
+								}
+							/>
+							<InlineField
+								label="Portal submissions"
+								value={String(company.portalSubmissions)}
+								saving={isSaving("portalSubmissions")}
+								onSave={(next) => saveCount("portalSubmissions", next)}
+							/>
+							<InlineField
+								label="Customers referred"
+								value={String(company.customersReferred)}
+								saving={isSaving("customersReferred")}
+								onSave={(next) => saveCount("customersReferred", next)}
+							/>
+							<DetailSheetProperty label="Converted">
+								{company.convertedAt ? (
+									<LocalDateTime
+										date={company.convertedAt}
+										options={CONVERTED_FORMAT}
+									/>
+								) : (
+									<EmptyCellValue />
+								)}
+							</DetailSheetProperty>
+						</DetailSheetProperties>
+					</DetailSheetSection>
+
+					<DetailSheetSection title="Notes">
+						<InlineTextArea
+							label="Notes"
+							value={company.notes}
+							saving={isSaving("notes")}
+							placeholder="What matters about this account?"
+							onSave={(notes) => save({ notes })}
+						/>
 					</DetailSheetSection>
 
 					<DetailSheetPending

@@ -24,23 +24,23 @@ model User {
   sessions      Session[]
   accounts      Account[]
 
-  ownedCompanies Company[]           @relation("CompanyOwner")
-  ownedContacts  Contact[]           @relation("ContactOwner")
-  ownedDeals     Deal[]              @relation("DealOwner")
-  ownedLeads     Lead[]              @relation("LeadOwner")
-  activities     Activity[]          @relation("ActivityAuthor")
-  mailboxSyncs   MailboxSync[]
-  factDecisions  ContactFact[]       @relation("FactDecider")
-  conversations  AgentConversation[] @relation("ConversationOwner")
-  fieldValues    FieldValue[]        @relation("FieldValueUser")
-  savedViews     SavedView[]         @relation("SavedViewOwner")
-  metaPageConnections MetaPageConnection[] @relation("MetaConnectionOwner")
-	messageTemplates MessageTemplate[] @relation("MessageTemplateCreator")
-	inboundWebhooks InboundWebhook[] @relation("InboundWebhookCreator")
-	employeeProfile EmployeeProfile? @relation("EmployeeProfileUser")
-	managedEmployees EmployeeProfile[] @relation("EmployeeProfileManager")
-	reimbursements Reimbursement[] @relation("ReimbursementEmployee")
-	reviewedReimbursements Reimbursement[] @relation("ReimbursementReviewer")
+  ownedCompanies         Company[]            @relation("CompanyOwner")
+  ownedContacts          Contact[]            @relation("ContactOwner")
+  ownedDeals             Deal[]               @relation("DealOwner")
+  ownedLeads             Lead[]               @relation("LeadOwner")
+  activities             Activity[]           @relation("ActivityAuthor")
+  mailboxSyncs           MailboxSync[]
+  factDecisions          ContactFact[]        @relation("FactDecider")
+  conversations          AgentConversation[]  @relation("ConversationOwner")
+  fieldValues            FieldValue[]         @relation("FieldValueUser")
+  savedViews             SavedView[]          @relation("SavedViewOwner")
+  metaPageConnections    MetaPageConnection[] @relation("MetaConnectionOwner")
+  messageTemplates       MessageTemplate[]    @relation("MessageTemplateCreator")
+  inboundWebhooks        InboundWebhook[]     @relation("InboundWebhookCreator")
+  employeeProfile        EmployeeProfile?     @relation("EmployeeProfileUser")
+  managedEmployees       EmployeeProfile[]    @relation("EmployeeProfileManager")
+  reimbursements         Reimbursement[]      @relation("ReimbursementEmployee")
+  reviewedReimbursements Reimbursement[]      @relation("ReimbursementReviewer")
 
   createdAgentDefinitions AgentDefinition[]             @relation("AgentDefinitionCreator")
   createdAgentVersions    AgentVersion[]                @relation("AgentVersionCreator")
@@ -304,8 +304,20 @@ model Company {
   subIndustry String?
   city        String?
   stateCode   String?
+  state       String?
+  address     String?
   country     String?
   countryCode String?
+
+  accountType       LeadKind?
+  operatingRegions  String?
+  installationType  String?
+  portalStatus      EpcPortalStatus @default(NOT_REGISTERED)
+  onboardedAt       DateTime?
+  portalSubmissions Int             @default(0)
+  customersReferred Int             @default(0)
+  notes             String?
+  convertedAt       DateTime?
 
   phone       String?
   email       String?
@@ -360,18 +372,20 @@ model CompanyEnrichment {
 }
 
 model Contact {
-  id          String  @id @default(cuid())
-  firstName   String
-  lastName    String?
-  email       String?
-  phone       String?
-  title       String?
-  seniority   String?
-  function    String?
-  linkedinUrl String?
-  twitterUrl  String?
-  githubUrl   String?
-  imageUrl    String?
+  id             String  @id @default(cuid())
+  firstName      String
+  lastName       String?
+  email          String?
+  phone          String?
+  secondaryPhone String?
+  notes          String?
+  title          String?
+  seniority      String?
+  function       String?
+  linkedinUrl    String?
+  twitterUrl     String?
+  githubUrl      String?
+  imageUrl       String?
 
   socialsCheckedAt DateTime?
 
@@ -967,14 +981,19 @@ model Deal {
   @@map("deal")
 }
 
-
 enum LeadStage {
-  UNASSIGNED
-  ASSIGNED
-  TALKING
+  NOT_CONTACTED
+  CONTACTED
   INTERESTED
-  REJECTED
-  APPROVED
+  FOLLOW_UP
+  ONBOARDED
+  NOT_INTERESTED
+  NOT_QUALIFIED
+}
+
+enum EpcPortalStatus {
+  NOT_REGISTERED
+  REGISTERED
 }
 
 enum NavirexEntity {
@@ -991,24 +1010,32 @@ enum LeadKind {
 model Lead {
   id          String  @id @default(cuid())
   name        String
+  designation String?
   companyName String?
   email       String?
   phone       String?
 
+  secondaryPhone String?
+  secondaryEmail String?
+  website        String?
+  state          String?
+  address        String?
+  nextAction     String?
+
   kind   LeadKind       @default(EPC)
   entity NavirexEntity?
 
-  stage          LeadStage @default(UNASSIGNED)
+  stage          LeadStage @default(NOT_CONTACTED)
   stageChangedAt DateTime  @default(now())
   position       Int       @default(0)
 
   ownerId String?
   owner   User?   @relation("LeadOwner", fields: [ownerId], references: [id], onDelete: SetNull)
 
-  source        String?
-  externalId    String?
-  country       String?
-  notes         String?
+  source         String?
+  externalId     String?
+  country        String?
+  notes          String?
   rejectedReason String?
 
   zohoId String?
@@ -1018,15 +1045,18 @@ model Lead {
   contactId String?
   contact   Contact? @relation(fields: [contactId], references: [id], onDelete: SetNull)
 
+  convertedAt DateTime?
+
   lastActivityAt DateTime?
   archivedAt     DateTime?
 
-  activities Activity[]
+  activities      Activity[]
   formSubmissions FormSubmission[]
-  createdAt  DateTime   @default(now())
-  updatedAt  DateTime   @updatedAt
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
 
   @@unique([zohoId])
+  @@unique([source, externalId])
   @@index([stage, position])
   @@index([ownerId])
   @@index([entity])
@@ -1035,7 +1065,6 @@ model Lead {
   @@index([contactId])
   @@index([lastActivityAt])
   @@index([archivedAt])
-  @@unique([source, externalId])
   @@map("lead")
 }
 
@@ -1046,7 +1075,7 @@ model MetaPageConnection {
   accessToken String
 
   connectedById String
-  connectedBy   User @relation("MetaConnectionOwner", fields: [connectedById], references: [id], onDelete: Cascade)
+  connectedBy   User   @relation("MetaConnectionOwner", fields: [connectedById], references: [id], onDelete: Cascade)
 
   subscribedAt DateTime?
   lastSyncedAt DateTime?
@@ -1060,110 +1089,110 @@ model MetaPageConnection {
 }
 
 enum MessageTemplateChannel {
-	EMAIL
-	WHATSAPP
-	NOTE
+  EMAIL
+  WHATSAPP
+  NOTE
 }
 
 model MessageTemplate {
-	id String @id @default(cuid())
-	name String
-	channel MessageTemplateChannel
-	subject String?
-	body String
-	providerTemplateName String?
-	providerTemplateId String? @unique
-	providerStatus String?
-	providerCategory String?
-	providerSyncedAt DateTime?
-	language String @default("en_US")
-	active Boolean @default(true)
+  id                   String                 @id @default(cuid())
+  name                 String
+  channel              MessageTemplateChannel
+  subject              String?
+  body                 String
+  providerTemplateName String?
+  providerTemplateId   String?                @unique
+  providerStatus       String?
+  providerCategory     String?
+  providerSyncedAt     DateTime?
+  language             String                 @default("en_US")
+  active               Boolean                @default(true)
 
-	createdById String
-	createdBy User @relation("MessageTemplateCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  createdById String
+  createdBy   User   @relation("MessageTemplateCreator", fields: [createdById], references: [id], onDelete: Restrict)
 
-	createdAt DateTime @default(now())
-	updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-	@@unique([channel, name])
-	@@index([active, channel])
-	@@map("messageTemplate")
+  @@unique([channel, name])
+  @@index([active, channel])
+  @@map("messageTemplate")
 }
 
 model InboundWebhook {
-	id String @id @default(cuid())
-	name String
-	source String
-	secretHash String
-	enabled Boolean @default(true)
-	lastReceivedAt DateTime?
-	lastError String?
+  id             String    @id @default(cuid())
+  name           String
+  source         String
+  secretHash     String
+  enabled        Boolean   @default(true)
+  lastReceivedAt DateTime?
+  lastError      String?
 
-	createdById String
-	createdBy User @relation("InboundWebhookCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  createdById String
+  createdBy   User   @relation("InboundWebhookCreator", fields: [createdById], references: [id], onDelete: Restrict)
 
-	createdAt DateTime @default(now())
-	updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-	@@index([enabled])
-	@@map("inboundWebhook")
+  @@index([enabled])
+  @@map("inboundWebhook")
 }
 
 model EmployeeProfile {
-	userId String @id
-	user User @relation("EmployeeProfileUser", fields: [userId], references: [id], onDelete: Cascade)
-	employeeCode String? @unique
-	department String?
-	location String?
-	phone String?
-	employmentType String?
-	joinedAt DateTime?
-	bio String?
-	emergencyContactName String?
-	emergencyContactPhone String?
+  userId                String    @id
+  user                  User      @relation("EmployeeProfileUser", fields: [userId], references: [id], onDelete: Cascade)
+  employeeCode          String?   @unique
+  department            String?
+  location              String?
+  phone                 String?
+  employmentType        String?
+  joinedAt              DateTime?
+  bio                   String?
+  emergencyContactName  String?
+  emergencyContactPhone String?
 
-	managerId String?
-	manager User? @relation("EmployeeProfileManager", fields: [managerId], references: [id], onDelete: SetNull)
+  managerId String?
+  manager   User?   @relation("EmployeeProfileManager", fields: [managerId], references: [id], onDelete: SetNull)
 
-	createdAt DateTime @default(now())
-	updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-	@@index([managerId])
-	@@index([department])
-	@@map("employeeProfile")
+  @@index([managerId])
+  @@index([department])
+  @@map("employeeProfile")
 }
 
 enum ReimbursementStatus {
-	SUBMITTED
-	APPROVED
-	REJECTED
-	PAID
+  SUBMITTED
+  APPROVED
+  REJECTED
+  PAID
 }
 
 model Reimbursement {
-	id String @id @default(cuid())
-	title String
-	description String?
-	amount Decimal @db.Decimal(14, 2)
-	currency String @default("INR")
-	expenseDate DateTime
-	receiptUrl String?
-	status ReimbursementStatus @default(SUBMITTED)
-	reviewNote String?
+  id          String              @id @default(cuid())
+  title       String
+  description String?
+  amount      Decimal             @db.Decimal(14, 2)
+  currency    String              @default("INR")
+  expenseDate DateTime
+  receiptUrl  String?
+  status      ReimbursementStatus @default(SUBMITTED)
+  reviewNote  String?
 
-	employeeId String
-	employee User @relation("ReimbursementEmployee", fields: [employeeId], references: [id], onDelete: Cascade)
-	reviewedById String?
-	reviewedBy User? @relation("ReimbursementReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
-	reviewedAt DateTime?
-	paidAt DateTime?
+  employeeId   String
+  employee     User      @relation("ReimbursementEmployee", fields: [employeeId], references: [id], onDelete: Cascade)
+  reviewedById String?
+  reviewedBy   User?     @relation("ReimbursementReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+  reviewedAt   DateTime?
+  paidAt       DateTime?
 
-	createdAt DateTime @default(now())
-	updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-	@@index([employeeId, createdAt])
-	@@index([status, createdAt])
-	@@map("reimbursement")
+  @@index([employeeId, createdAt])
+  @@index([status, createdAt])
+  @@map("reimbursement")
 }
 
 enum RateSource {
@@ -1524,13 +1553,13 @@ model AppSetting {
 
   archiveRetentionDays Int @default(180)
 
-  reimbursementNotifyManager Boolean @default(true)
+  reimbursementNotifyManager      Boolean  @default(true)
   reimbursementNotificationEmails String[] @default([])
 
-  whatsappBusinessAccountId String?
+  whatsappBusinessAccountId      String?
   whatsappTemplatesLastAttemptAt DateTime?
-  whatsappTemplatesLastSyncedAt DateTime?
-  whatsappTemplatesLastError String?
+  whatsappTemplatesLastSyncedAt  DateTime?
+  whatsappTemplatesLastError     String?
 
   trackingSiteId           String? @unique
   trackingCrossDomain      Boolean @default(true)

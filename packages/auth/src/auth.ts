@@ -10,6 +10,12 @@ import { organization } from "better-auth/plugins/organization";
 import { API_KEY_EXPIRATION, API_KEY_HEADER, API_KEY_PREFIX } from "./api-keys";
 import { AUTH_COOKIE_PREFIX } from "./cookies";
 import { env } from "./env";
+import {
+	INVITES,
+	invitationForToken,
+	NotInvitedError,
+	pendingInvitationFor,
+} from "./invitations";
 import { ensureWorkspaceMembership } from "./organization";
 import {
 	GOOGLE_PROVIDER_ID,
@@ -316,7 +322,12 @@ export const auth = betterAuth({
 
 		user: {
 			create: {
-				before: async (user) => {
+				before: async (user, context) => {
+					if ((await db.user.count()) > 0) {
+						await assertInvited(user.email, context);
+						return { data: user };
+					}
+
 					if (!hasSignInAllowList()) {
 						throw new APIError("FORBIDDEN", {
 							message:
@@ -341,7 +352,14 @@ export const auth = betterAuth({
 		session: {
 			create: {
 				before: async (session) => {
-					const workspaceId = await ensureWorkspaceMembership(session.userId);
+					const workspaceId = await ensureWorkspaceMembership(
+						session.userId,
+					).catch((error: unknown) => {
+						if (error instanceof NotInvitedError) {
+							throw new APIError("FORBIDDEN", { message: error.message });
+						}
+						throw error;
+					});
 
 					return {
 						data: { ...session, activeOrganizationId: workspaceId ?? null },
@@ -364,6 +382,21 @@ export const auth = betterAuth({
 export type Auth = typeof auth;
 export type Session = typeof auth.$Infer.Session;
 export type SessionUser = Session["user"];
+
+const PASSWORD_SIGN_UP_PATH = "/sign-up/email";
+
+type HookContext = { path?: string; headers?: Headers } | null;
+
+async function assertInvited(email: string, context: HookContext) {
+	const invitation =
+		context?.path === PASSWORD_SIGN_UP_PATH
+			? await invitationForToken(context.headers?.get(INVITES.header), db)
+			: await pendingInvitationFor(email, db);
+
+	if (invitation?.email.toLowerCase() !== email.trim().toLowerCase()) {
+		throw new APIError("FORBIDDEN", { message: new NotInvitedError().message });
+	}
+}
 
 async function replaceSlackAccount(account: {
 	id: string;

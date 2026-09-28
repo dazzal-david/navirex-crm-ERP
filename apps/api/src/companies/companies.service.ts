@@ -1,6 +1,8 @@
 import {
 	type Db,
 	type EnrichmentStatus,
+	type EpcPortalStatus,
+	type LeadKind,
 	type Prisma,
 	Prisma as PrismaNamespace,
 	type RecordSource,
@@ -183,6 +185,17 @@ export class CompaniesService {
 				githubUrl: true,
 				pricingUrl: true,
 				careersUrl: true,
+				state: true,
+				address: true,
+				accountType: true,
+				operatingRegions: true,
+				installationType: true,
+				portalStatus: true,
+				onboardedAt: true,
+				portalSubmissions: true,
+				customersReferred: true,
+				notes: true,
+				convertedAt: true,
 				enrichmentStatus: true,
 				enrichedAt: true,
 				enrichmentError: true,
@@ -238,6 +251,8 @@ export class CompaniesService {
 			enrichedAt,
 			createdAt,
 			archivedAt,
+			onboardedAt,
+			convertedAt,
 			...rest
 		} = company;
 
@@ -248,6 +263,8 @@ export class CompaniesService {
 			createdAt: createdAt.toISOString(),
 			archivedAt: archivedAt?.toISOString() ?? null,
 			enrichedAt: enrichedAt?.toISOString() ?? null,
+			onboardedAt: onboardedAt?.toISOString() ?? null,
+			convertedAt: convertedAt?.toISOString() ?? null,
 			primaryContactId: primaryContact?.id ?? null,
 			primaryContact,
 			reportingCurrency: await this.conversion.reportingCurrency(),
@@ -272,7 +289,8 @@ export class CompaniesService {
 	}
 
 	async create(input: CompanyCreateInput) {
-		const domain = normalizeDomain(input.domain);
+		const domain =
+			normalizeDomain(input.domain) ?? (await this.freeDomainOf(input.website));
 
 		if (domain) {
 			const existing = await this.db.company.findFirst({
@@ -289,13 +307,41 @@ export class CompaniesService {
 		const company = await this.agent.withCrmEvents(async (tx, emit) => {
 			const created = await tx.company.create({
 				data: {
+					...accountData(input),
 					name: input.name.trim(),
 					domain,
-					website: domain ? `https://${domain}` : null,
+					website:
+						blankToNull(input.website ?? "") ??
+						(domain ? `https://${domain}` : null),
+					email: blankToNull(input.email ?? ""),
+					country: blankToNull(input.country ?? ""),
 					ownerId: input.ownerId ?? null,
 				},
 				select: { id: true, name: true, domain: true, createdAt: true },
 			});
+			const contactName = blankToNull(input.contactName ?? "");
+			if (contactName) {
+				const [firstName, ...rest] = contactName.split(/\s+/);
+				const contact = await tx.contact.create({
+					data: {
+						firstName: firstName ?? contactName,
+						lastName: rest.length > 0 ? rest.join(" ") : null,
+						companyId: created.id,
+						ownerId: input.ownerId ?? null,
+					},
+					select: { id: true, createdAt: true },
+				});
+				await tx.company.update({
+					where: { id: created.id },
+					data: { primaryContactId: contact.id },
+				});
+				await emit({
+					type: "contact.created",
+					record: { kind: "contact", id: contact.id },
+					occurredAt: contact.createdAt,
+					data: { firstName, companyId: created.id },
+				});
+			}
 			await emit({
 				type: "company.created",
 				record: { kind: "company", id: created.id },
@@ -319,8 +365,18 @@ export class CompaniesService {
 		return { id: company.id, name: company.name, domain: company.domain };
 	}
 
+	private async freeDomainOf(website: string | undefined) {
+		const domain = normalizeDomain(website);
+		if (!domain) return null;
+		const taken = await this.db.company.findFirst({
+			where: { domain, archivedAt: null },
+			select: { id: true },
+		});
+		return taken ? null : domain;
+	}
+
 	async update(id: string, input: CompanyUpdateInput) {
-		const data: Prisma.CompanyUpdateInput = {};
+		const data: Prisma.CompanyUpdateInput = accountData(input);
 
 		if (input.name !== undefined) data.name = input.name.trim();
 		if (input.website !== undefined) data.website = blankToNull(input.website);
@@ -733,4 +789,54 @@ export class CompaniesService {
 		}
 		throw cause;
 	}
+}
+
+function accountData(
+	input: Pick<
+		CompanyUpdateInput,
+		| "accountType"
+		| "state"
+		| "address"
+		| "operatingRegions"
+		| "installationType"
+		| "portalStatus"
+		| "onboardedAt"
+		| "portalSubmissions"
+		| "customersReferred"
+		| "notes"
+	>,
+) {
+	const data: {
+		accountType?: LeadKind | null;
+		state?: string | null;
+		address?: string | null;
+		operatingRegions?: string | null;
+		installationType?: string | null;
+		portalStatus?: EpcPortalStatus;
+		onboardedAt?: Date | null;
+		portalSubmissions?: number;
+		customersReferred?: number;
+		notes?: string | null;
+	} = {};
+	if (input.accountType !== undefined) data.accountType = input.accountType;
+	if (input.state !== undefined) data.state = blankToNull(input.state);
+	if (input.address !== undefined) data.address = blankToNull(input.address);
+	if (input.operatingRegions !== undefined) {
+		data.operatingRegions = blankToNull(input.operatingRegions);
+	}
+	if (input.installationType !== undefined) {
+		data.installationType = blankToNull(input.installationType);
+	}
+	if (input.portalStatus !== undefined) data.portalStatus = input.portalStatus;
+	if (input.onboardedAt !== undefined) {
+		data.onboardedAt = input.onboardedAt ? new Date(input.onboardedAt) : null;
+	}
+	if (input.portalSubmissions !== undefined) {
+		data.portalSubmissions = input.portalSubmissions;
+	}
+	if (input.customersReferred !== undefined) {
+		data.customersReferred = input.customersReferred;
+	}
+	if (input.notes !== undefined) data.notes = blankToNull(input.notes);
+	return data;
 }

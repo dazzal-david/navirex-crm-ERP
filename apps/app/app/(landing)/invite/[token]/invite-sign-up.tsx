@@ -1,17 +1,32 @@
 "use client";
 
-import { signIn } from "@crm/auth/client";
+import { signUp } from "@crm/auth/client";
+import { INVITES } from "@crm/auth/invite-config";
 import { Button } from "@crm/ui/components/button";
-import { Field, FieldGroup, FieldLabel } from "@crm/ui/components/field";
+import {
+	Field,
+	FieldDescription,
+	FieldGroup,
+	FieldLabel,
+} from "@crm/ui/components/field";
 import { Input } from "@crm/ui/components/input";
 import { Spinner } from "@crm/ui/components/spinner";
 import { useRouter } from "next/navigation";
 import { useId, useState } from "react";
 import { toast } from "sonner";
 
-export function PasswordSignIn() {
+const MIN_PASSWORD_LENGTH = 12;
+
+export function InviteSignUp({
+	email,
+	token,
+}: {
+	email: string;
+	token: string;
+}) {
 	const router = useRouter();
 
+	const nameId = useId();
 	const emailId = useId();
 	const passwordId = useId();
 
@@ -23,10 +38,13 @@ export function PasswordSignIn() {
 	}
 
 	async function submit(form: FormData) {
-		const email = String(form.get("email") ?? "").trim();
+		const name = String(form.get("name") ?? "").trim();
 		const password = String(form.get("password") ?? "");
 
-		const { error } = await signIn.email({ email, password });
+		const { error } = await signUp.email(
+			{ email, password, name: name || email },
+			{ headers: { [INVITES.header]: token } },
+		);
 
 		if (error) {
 			fail(error.message);
@@ -51,36 +69,48 @@ export function PasswordSignIn() {
 					<FieldLabel htmlFor={emailId}>Email</FieldLabel>
 					<Input
 						autoComplete="email"
-						autoFocus
 						id={emailId}
 						name="email"
-						placeholder="you@company.com"
-						required
+						readOnly
 						type="email"
+						value={email}
+					/>
+				</Field>
+
+				<Field>
+					<FieldLabel htmlFor={nameId}>Name</FieldLabel>
+					<Input
+						autoComplete="name"
+						autoFocus
+						id={nameId}
+						name="name"
+						placeholder="Your name"
+						required
+						type="text"
 					/>
 				</Field>
 
 				<Field>
 					<FieldLabel htmlFor={passwordId}>Password</FieldLabel>
 					<Input
-						autoComplete="current-password"
+						autoComplete="new-password"
 						id={passwordId}
+						minLength={MIN_PASSWORD_LENGTH}
 						name="password"
 						placeholder="Your password"
 						required
 						type="password"
 					/>
+					<FieldDescription>
+						At least {MIN_PASSWORD_LENGTH} characters.
+					</FieldDescription>
 				</Field>
 			</FieldGroup>
 
 			<Button className="w-full" disabled={pending} type="submit">
 				{pending ? <Spinner data-icon="inline-start" /> : null}
-				Sign in
+				Create account
 			</Button>
-
-			<p className="text-center text-muted-foreground text-sm/5">
-				Access is by invitation only. Ask a Founder or Superadmin to invite you.
-			</p>
 		</form>
 	);
 }

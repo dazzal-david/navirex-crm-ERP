@@ -1,12 +1,13 @@
 import { z } from "zod";
 
 export const LEAD_STAGES = [
-	"UNASSIGNED",
-	"ASSIGNED",
-	"TALKING",
+	"NOT_CONTACTED",
+	"CONTACTED",
 	"INTERESTED",
-	"REJECTED",
-	"APPROVED",
+	"FOLLOW_UP",
+	"ONBOARDED",
+	"NOT_INTERESTED",
+	"NOT_QUALIFIED",
 ] as const;
 
 export const LEAD_KINDS = ["EPC", "CUSTOMER", "OTHER"] as const;
@@ -20,6 +21,7 @@ export const navirexEntity = z.enum(NAVIREX_ENTITIES);
 export const leadCard = z.object({
 	id: z.string(),
 	name: z.string(),
+	designation: z.string().nullable(),
 	companyName: z.string().nullable(),
 	email: z.string().nullable(),
 	phone: z.string().nullable(),
@@ -30,6 +32,10 @@ export const leadCard = z.object({
 	source: z.string().nullable(),
 	country: z.string().nullable(),
 	rejectedReason: z.string().nullable(),
+	nextAction: z.string().nullable(),
+	companyId: z.string().nullable(),
+	contactId: z.string().nullable(),
+	convertedAt: z.date().nullable(),
 	owner: z
 		.object({
 			id: z.string(),
@@ -80,17 +86,26 @@ export const boardOutput = z.object({
 	columns: z.array(boardColumn),
 });
 
+const optionalEmail = z.email().max(320).optional().or(z.literal(""));
+
 export const leadCreateInput = z.object({
 	name: z.string().trim().min(1).max(200),
+	designation: z.string().trim().max(200).optional(),
 	companyName: z.string().trim().max(200).optional(),
-	email: z.email().max(320).optional().or(z.literal("")),
+	email: optionalEmail,
+	secondaryEmail: optionalEmail,
 	phone: z.string().trim().max(50).optional(),
+	secondaryPhone: z.string().trim().max(50).optional(),
+	website: z.string().trim().max(500).optional(),
 	kind: leadKind.default("EPC"),
 	entity: navirexEntity.optional(),
-	stage: leadStage.default("UNASSIGNED"),
+	stage: leadStage.default("NOT_CONTACTED"),
 	ownerId: z.string().optional(),
 	source: z.string().trim().max(120).optional(),
 	country: z.string().trim().max(120).optional(),
+	state: z.string().trim().max(120).optional(),
+	address: z.string().trim().max(1000).optional(),
+	nextAction: z.string().trim().max(1000).optional(),
 	notes: z.string().trim().max(5000).optional(),
 });
 
@@ -147,6 +162,11 @@ export const leadAssignInput = z.object({
 });
 
 export const leadDetailOutput = leadCard.extend({
+	secondaryPhone: z.string().nullable(),
+	secondaryEmail: z.string().nullable(),
+	website: z.string().nullable(),
+	state: z.string().nullable(),
+	address: z.string().nullable(),
 	notes: z.string().nullable(),
 	zohoId: z.string().nullable(),
 	stageChangedAt: z.date(),
@@ -154,6 +174,13 @@ export const leadDetailOutput = leadCard.extend({
 });
 
 export const leadMutateOutput = leadCard;
+
+export const leadConvertOutput = z.object({
+	leadId: z.string(),
+	companyId: z.string(),
+	contactId: z.string(),
+	convertedAt: z.date(),
+});
 
 export const leadDeleteOutput = z.object({ id: z.string() });
 

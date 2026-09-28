@@ -429,17 +429,17 @@ function dealStage(value: string) {
 }
 
 function leadStage(value: string, converted: string) {
-	if (/true|yes/i.test(converted)) return "APPROVED" as const;
+	if (/true|yes/i.test(converted)) return "ONBOARDED" as const;
 	const normalized = value.toLowerCase();
-	if (/not qualified|junk|lost|reject/.test(normalized))
-		return "REJECTED" as const;
+	if (/not qualified|junk/.test(normalized)) return "NOT_QUALIFIED" as const;
+	if (/lost|reject/.test(normalized)) return "NOT_INTERESTED" as const;
 	if (/pre-qualified|interest|hot/.test(normalized))
 		return "INTERESTED" as const;
-	if (/contacted|attempted|future|follow/.test(normalized))
-		return "TALKING" as const;
+	if (/future|follow/.test(normalized)) return "FOLLOW_UP" as const;
+	if (/contacted|attempted/.test(normalized)) return "CONTACTED" as const;
 	if (/qualified|approve|convert|won/.test(normalized))
-		return "APPROVED" as const;
-	return "UNASSIGNED" as const;
+		return "ONBOARDED" as const;
+	return "NOT_CONTACTED" as const;
 }
 
 function relationFor(relatedId: string, contactId?: string) {

@@ -23,6 +23,7 @@ import { EnrichmentModule } from "./enrichment/enrichment.module";
 import { FieldsModule } from "./fields/fields.module";
 import { GoogleModule } from "./google/google.module";
 import { HealthModule } from "./health/health.module";
+import { InvitationsModule } from "./invitations/invitations.module";
 import { LeadsModule } from "./leads/leads.module";
 import { LoggingModule } from "./logging/logging.module";
 import { logAuthRoute } from "./logging/request-logger.middleware";
@@ -60,6 +61,7 @@ import { WorkspaceModule } from "./workspace/workspace.module";
 		HealthModule,
 		TrpcModule,
 		UsersModule,
+		InvitationsModule,
 		ApiKeysModule,
 		CompaniesModule,
 		CommunicationsModule,

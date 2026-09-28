@@ -15,12 +15,12 @@ const dashboard = new DashboardService(db, new ConversionService(db));
 
 async function createLead(name: string, ownerId?: string) {
 	return service.create(
-		{ name, kind: "EPC", stage: "UNASSIGNED", ownerId },
+		{ name, kind: "EPC", stage: "NOT_CONTACTED", ownerId },
 		userId,
 	);
 }
 
-async function positions(stage: "UNASSIGNED" | "TALKING") {
+async function positions(stage: "NOT_CONTACTED" | "CONTACTED") {
 	const rows = await db.lead.findMany({
 		where: { stage, archivedAt: null },
 		orderBy: [{ position: "asc" }, { createdAt: "desc" }],
@@ -48,52 +48,126 @@ afterAll(async () => {
 	await db.lead.deleteMany({
 		where: { OR: [{ ownerId: userId }, { ownerId: null }] },
 	});
+	await db.contact.deleteMany({ where: { ownerId: userId } });
+	await db.company.deleteMany({ where: { ownerId: userId } });
 	await db.user.deleteMany({ where: { id: { in: [userId, otherId] } } });
 });
 
 describe("the lead board", () => {
-	it("puts a new lead in Unassigned with nobody on it", async () => {
+	it("starts a new lead as Not contacted with nobody on it", async () => {
 		const lead = await createLead(`New ${suffix}`);
 
-		expect(lead.stage).toBe("UNASSIGNED");
+		expect(lead.stage).toBe("NOT_CONTACTED");
 		expect(lead.owner).toBeNull();
 	});
 
-	it("does not leave a named owner sitting in Unassigned", async () => {
+	it("keeps the status when an owner is named", async () => {
 		const lead = await createLead(`Owned ${suffix}`, userId);
 
-		expect(lead.stage).toBe("ASSIGNED");
+		expect(lead.stage).toBe("NOT_CONTACTED");
 		expect(lead.owner?.id).toBe(userId);
 	});
 
-	it("takes the owner off a lead sent back to Unassigned", async () => {
+	it("keeps the owner on a lead moved back to Not contacted", async () => {
 		const lead = await createLead(`Returning ${suffix}`, userId);
 		const back = await service.move(
-			{ id: lead.id, stage: "UNASSIGNED" },
-			userId,
-		);
-
-		expect(back.stage).toBe("UNASSIGNED");
-		expect(back.owner).toBeNull();
-	});
-
-	it("gives an unowned lead to whoever drags it out of Unassigned", async () => {
-		const lead = await createLead(`Dragged ${suffix}`);
-		const moved = await service.move(
-			{ id: lead.id, stage: "TALKING" },
+			{ id: lead.id, stage: "NOT_CONTACTED" },
 			otherId,
 		);
 
-		expect(moved.stage).toBe("TALKING");
+		expect(back.stage).toBe("NOT_CONTACTED");
+		expect(back.owner?.id).toBe(userId);
+	});
+
+	it("gives an unowned lead to whoever moves it forward", async () => {
+		const lead = await createLead(`Dragged ${suffix}`);
+		const moved = await service.move(
+			{ id: lead.id, stage: "CONTACTED" },
+			otherId,
+		);
+
+		expect(moved.stage).toBe("CONTACTED");
 		expect(moved.owner?.id).toBe(otherId);
 	});
 
-	it("moves a lead out of Unassigned when somebody is given it", async () => {
+	it("assigns an owner without touching the status", async () => {
 		const lead = await createLead(`Assignable ${suffix}`);
 		const assigned = await service.assign(lead.id, otherId, userId);
 
-		expect(assigned.stage).toBe("ASSIGNED");
+		expect(assigned.stage).toBe("NOT_CONTACTED");
 		expect(assigned.owner?.id).toBe(otherId);
+	});
+
+	it("stores the extra lead details and clears only what is sent", async () => {
+		const lead = await service.create(
+			{
+				name: `Detailed ${suffix}`,
+				kind: "EPC",
+				stage: "NOT_CONTACTED",
+				designation: "Procurement head",
+				secondaryPhone: "+91 90000 00001",
+				secondaryEmail: "Second@Example.test",
+				website: "https://example.test",
+				state: "Kerala",
+				address: "MG Road",
+				nextAction: "Call on Monday",
+			},
+			userId,
+		);
+		await service.update({ id: lead.id, nextAction: "" }, userId);
+		const detail = await service.byId(lead.id);
+
+		expect(detail.designation).toBe("Procurement head");
+		expect(detail.secondaryEmail).toBe("second@example.test");
+		expect(detail.state).toBe("Kerala");
+		expect(detail.address).toBe("MG Road");
+		expect(detail.nextAction).toBeNull();
+	});
+
+	it("converts a lead into a company and contact, once", async () => {
+		const lead = await service.create(
+			{
+				name: `Asha Menon ${suffix}`,
+				companyName: `Sunrise EPC ${suffix}`,
+				email: `asha-${suffix}@example.test`,
+				phone: "+91 90000 00002",
+				designation: "Director",
+				kind: "EPC",
+				stage: "ONBOARDED",
+				ownerId: userId,
+				country: "India",
+				state: "Kerala",
+			},
+			userId,
+		);
+
+		const first = await service.convert(lead.id, userId);
+		const again = await service.convert(lead.id, userId);
+
+		const company = await db.company.findUniqueOrThrow({
+			where: { id: first.companyId },
+		});
+		const contact = await db.contact.findUniqueOrThrow({
+			where: { id: first.contactId },
+		});
+
+		expect(again).toEqual(first);
+		expect(company.name).toBe(`Sunrise EPC ${suffix}`);
+		expect(company.accountType).toBe("EPC");
+		expect(company.state).toBe("Kerala");
+		expect(company.convertedAt).not.toBeNull();
+		expect(company.primaryContactId).toBe(contact.id);
+		expect(contact.firstName).toBe("Asha");
+		expect(contact.title).toBe("Director");
+		expect(contact.companyId).toBe(company.id);
+	});
+
+	it("refuses to convert a lead with no company name", async () => {
+		const lead = await createLead(`No company ${suffix}`);
+
+		await expect(service.convert(lead.id, userId)).rejects.toThrow(
+			"Add the company name",
+		);
 	});
 
 	it("drops a card between two neighbours without a tie", async () => {
@@ -106,14 +180,14 @@ describe("the lead board", () => {
 		await service.move(
 			{
 				id: mover.id,
-				stage: "UNASSIGNED",
+				stage: "NOT_CONTACTED",
 				beforeId: top.id,
 				afterId: bottom.id,
 			},
 			userId,
 		);
 
-		const rows = await positions("UNASSIGNED");
+		const rows = await positions("NOT_CONTACTED");
 		const seen = new Set(rows.map((row) => row.position));
 
 		expect(seen.size).toBe(rows.length);
@@ -132,11 +206,11 @@ describe("the lead board", () => {
 		const mover = await createLead(`Between ${suffix}`);
 
 		await service.move(
-			{ id: mover.id, stage: "UNASSIGNED", afterId: bottom.id },
+			{ id: mover.id, stage: "NOT_CONTACTED", afterId: bottom.id },
 			userId,
 		);
 
-		const rows = await positions("UNASSIGNED");
+		const rows = await positions("NOT_CONTACTED");
 		const seen = new Set(rows.map((row) => row.position));
 
 		expect(seen.size).toBe(rows.length);
@@ -153,14 +227,15 @@ describe("the lead board", () => {
 
 		const board = await service.board({}, userId);
 
-		expect(board.columns).toHaveLength(6);
+		expect(board.columns).toHaveLength(7);
 		expect(board.columns.map((column) => column.stage)).toEqual([
-			"UNASSIGNED",
-			"ASSIGNED",
-			"TALKING",
+			"NOT_CONTACTED",
+			"CONTACTED",
 			"INTERESTED",
-			"REJECTED",
-			"APPROVED",
+			"FOLLOW_UP",
+			"ONBOARDED",
+			"NOT_INTERESTED",
+			"NOT_QUALIFIED",
 		]);
 		expect(board.columns[0]?.total).toBe(1);
 	});
@@ -182,7 +257,7 @@ describe("the lead board", () => {
 			{
 				name: `Website ${suffix}`,
 				kind: "CUSTOMER",
-				stage: "UNASSIGNED",
+				stage: "NOT_CONTACTED",
 				ownerId: userId,
 				entity: "INDIA",
 				source: "Website form",
@@ -203,7 +278,7 @@ describe("the lead board", () => {
 		expect(summary.totals.all).toBe(1);
 		expect(summary.totals.active).toBe(1);
 		expect(summary.totals.needsAttention).toBe(1);
-		expect(summary.stages).toHaveLength(6);
+		expect(summary.stages).toHaveLength(7);
 		expect(summary.sources[0]).toEqual({
 			source: "Website form",
 			count: 1,
@@ -217,7 +292,7 @@ describe("the lead board", () => {
 			name: `Intake ${suffix}`,
 			email: `intake-${suffix}@example.test`,
 			kind: "CUSTOMER" as const,
-			stage: "UNASSIGNED" as const,
+			stage: "NOT_CONTACTED" as const,
 			source: "Website API",
 			externalId: `submission-${suffix}`,
 		};

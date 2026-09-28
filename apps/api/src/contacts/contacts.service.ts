@@ -160,6 +160,8 @@ export class ContactsService {
 				lastName: true,
 				email: true,
 				phone: true,
+				secondaryPhone: true,
+				notes: true,
 				title: true,
 				linkedinUrl: true,
 				twitterUrl: true,
@@ -295,7 +297,9 @@ export class ContactsService {
 					lastName: blankToNull(input.lastName ?? ""),
 					email,
 					phone: blankToNull(input.phone ?? ""),
+					secondaryPhone: blankToNull(input.secondaryPhone ?? ""),
 					title: blankToNull(input.title ?? ""),
+					notes: blankToNull(input.notes ?? ""),
 					companyId,
 					ownerId: input.ownerId ?? null,
 				},
@@ -477,6 +481,10 @@ export class ContactsService {
 			input.email === undefined ? null : normalizeEmail(input.email);
 		if (input.email !== undefined) data.email = email;
 		if (input.phone !== undefined) data.phone = blankToNull(input.phone);
+		if (input.secondaryPhone !== undefined) {
+			data.secondaryPhone = blankToNull(input.secondaryPhone);
+		}
+		if (input.notes !== undefined) data.notes = blankToNull(input.notes);
 		if (input.title !== undefined) data.title = blankToNull(input.title);
 		if (input.linkedinUrl !== undefined) {
 			data.linkedinUrl = blankToNull(input.linkedinUrl);

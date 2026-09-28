@@ -46,7 +46,7 @@ async function IntakeConnectionPageContent({
 							source: "Navitrace website",
 							externalId: "form-submission-123",
 							kind: "CUSTOMER",
-							stage: "UNASSIGNED",
+							stage: "NOT_CONTACTED",
 						},
 						null,
 						2,

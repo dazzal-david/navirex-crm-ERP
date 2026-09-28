@@ -17,6 +17,7 @@ import {
 	columnPageInput,
 	columnPageOutput,
 	leadAssignInput,
+	leadConvertOutput,
 	leadCreateInput,
 	leadDeleteOutput,
 	leadDetailOutput,
@@ -162,6 +163,15 @@ export class LeadsRouter {
 		@Ctx() ctx: AuthedTrpcContext,
 	) {
 		return this.leads.assign(input.id, input.ownerId, ctx.user.id);
+	}
+
+	@Mutation({
+		input: leadIdInput,
+		output: leadConvertOutput,
+		meta: restMeta("POST", "/leads/{id}/convert", ["Leads"]),
+	})
+	async convert(@Input("id") id: string, @Ctx() ctx: AuthedTrpcContext) {
+		return this.leads.convert(id, ctx.user.id);
 	}
 
 	@Mutation({

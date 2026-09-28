@@ -2,6 +2,7 @@ import { db } from "@crm/db";
 import { DEFAULT_AGENT_MODEL } from "@crm/db/settings";
 import { defineAgent, defineDynamic } from "eve";
 import { z } from "zod";
+import { openRouterModel } from "../../lib/model";
 import { attribute, purposeOf } from "../../lib/session-purpose";
 
 export default defineAgent({
@@ -30,6 +31,7 @@ export default defineAgent({
 						}
 					: null;
 			},
+			"step.started": () => openRouterModel(),
 		},
 	}),
 	outputSchema: z.object({

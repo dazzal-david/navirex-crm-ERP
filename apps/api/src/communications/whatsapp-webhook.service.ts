@@ -158,7 +158,7 @@ export class WhatsAppWebhookService {
 				name: fromName?.trim() || `WhatsApp ${phone.slice(-4)}`,
 				phone: `+${phone}`,
 				kind: "OTHER",
-				stage: "UNASSIGNED",
+				stage: "NOT_CONTACTED",
 				source: "WhatsApp",
 				externalId: phone,
 				notes: body,

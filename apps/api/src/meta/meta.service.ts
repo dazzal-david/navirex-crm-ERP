@@ -292,7 +292,7 @@ export class MetaService {
 				email: email || undefined,
 				phone: phone || undefined,
 				kind: "OTHER",
-				stage: "UNASSIGNED",
+				stage: "NOT_CONTACTED",
 				source: `Meta Lead Ads · ${pageName}`,
 				externalId: lead.id,
 				country: pick(fields, "country") || undefined,

@@ -195,7 +195,7 @@ export class TrackingFilingService {
 			email: submission.email ?? undefined,
 			phone: submission.phone ?? undefined,
 			kind: "OTHER",
-			stage: "UNASSIGNED",
+			stage: "NOT_CONTACTED",
 			source,
 			externalId: submission.id,
 			notes: `Submitted a form on ${submission.host}.`,

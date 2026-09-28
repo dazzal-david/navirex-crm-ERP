@@ -43,10 +43,26 @@ here, what do we sell.
 
 - **The id is a constant, never a parameter.** A function taking an `organizationId`
   has turned the plugin into tenancy plumbing.
-- **Signing in is the join; no invite flow.** `ensureWorkspaceMembership` runs in
-  `databaseHooks.session.create.before` and **degrades, never throws** — a throw fails
-  the session create and locks everyone out. The plugin's `invitation` table is unused.
-- **First account is owner**, and the hook enrols pre-existing users, oldest first.
+- **Access is invite-only.** A Founder or Superadmin invites an address on
+  Settings → Members (`invitations.invite`). The link is `/invite/<token>`, and the
+  plugin's `invitation` row stores only `sha256(token)` as its id, so a database
+  read never yields a usable link. `INVITES` (`@crm/auth/invite-config`) holds the
+  header name, the 7-day expiry and the token size.
+- **Password sign-up needs the token.** `databaseHooks.user.create.before` reads
+  the `x-navirex-invite` header on `/sign-up/email` and refuses unless the token
+  names a live invitation for that exact address. Any other new account (Google,
+  Microsoft, SSO) needs a live invitation for its address. `ALLOWED_SIGN_IN` only
+  gates the very first account, when the `user` table is empty.
+- **Membership still happens in `ensureWorkspaceMembership`**, in
+  `databaseHooks.session.create.before`. An existing member passes. A person with
+  no member row joins with the invitation's role and uses it up. Anyone else gets
+  `NotInvitedError`, which the hook turns into a 403. Every other failure still
+  degrades and never throws, so a database blip cannot lock members out.
+- **Removing a member is real.** `invitations.removeMember` deletes the member row
+  and every session. The next sign-in has no member row and no invitation, so it
+  fails. A Founder cannot be removed; demote them first.
+- **First account is owner**, and the hook enrols pre-existing users, oldest first,
+  when the workspace has no members at all.
 - **Permissions come from `@crm/auth`** — `canRenameWorkspace`, `canChangeRole`,
   `canConfigureSso`, `canManageCurrency` — enforced by the service *and* used to
   disable the UI control, so the button and the 403 cannot disagree.
@@ -77,8 +93,8 @@ request.
 - **Both reads run concurrently**, but order decides which is *asked* — the research
   read is never made while onboarding is open.
 - **An unreachable API fails open** (`unknown` lets the request through).
-- **`/sign-in`, `/grant-access`, `/eve` are ungated.** `/sign-in` is the only path a
-  stranger may read; `/` joins it only when `IS_MARKETING` is set.
+- **`/sign-in`, `/grant-access`, `/eve` are ungated.** `/sign-in` and `/invite/<token>` are the only
+  paths a stranger may read; `/` joins it only when `IS_MARKETING` is set.
 - **There is no way past the key gate but to answer** — Skip stranded installs, every
   later company sitting `PENDING` with nothing saying so.
 
@@ -121,7 +137,7 @@ self-hoster's admin cannot redeploy.
   walls only an account whose sign-in rows are *all* mailbox providers — Google,
   Microsoft, or both — and none of them granted. `mailboxGrantsNeeded` returns which,
   so `/grant-access` offers the button they can actually use.
-- `ALLOWED_SIGN_IN` still decides who gets an account, in
+- An invitation, not `ALLOWED_SIGN_IN`, decides who gets an account, in
   `databaseHooks.user.create.before`, for SSO sign-ups too.
 - `organizationProvisioning: { disabled: true }` — `ensureWorkspaceMembership` already
   does the join.

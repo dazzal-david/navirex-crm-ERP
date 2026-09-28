@@ -1,6 +1,7 @@
 "use client";
 
 import Archive from "@carbon/icons-react/es/Archive";
+import Enterprise from "@carbon/icons-react/es/Enterprise";
 import { Badge } from "@crm/ui/components/badge";
 import { Button } from "@crm/ui/components/button";
 import { EmptyCellValue } from "@crm/ui/components/empty-cell";
@@ -26,11 +27,16 @@ import {
 } from "@/components/detail-sheet";
 import { LocalRelativeTime } from "@/components/local-date-time";
 import { LEAD_BOARD } from "@/lib/leads/board-config";
+import { useCrmCache } from "@/lib/trpc/cache";
 import { useTRPC } from "@/lib/trpc/client";
 import type { RouterOutputs } from "@/lib/trpc/types";
 import { LeadCommunicationActions } from "./lead-communications";
 import { RecordSheetFrame } from "./record-parts";
-import { useRecordSheetView, useRecordStack } from "./record-stack";
+import {
+	useOpenRecord,
+	useRecordSheetView,
+	useRecordStack,
+} from "./record-stack";
 
 type Lead = RouterOutputs["leads"]["byId"];
 
@@ -41,7 +47,7 @@ const STAGE_OPTIONS = LEAD_BOARD.stages.map((stage) => ({
 	label: LEAD_BOARD.label[stage],
 }));
 
-const KIND_OPTIONS = (["EPC", "CUSTOMER", "OTHER"] as const).map((kind) => ({
+const KIND_OPTIONS = LEAD_BOARD.kinds.map((kind) => ({
 	value: kind,
 	label: LEAD_BOARD.kind[kind],
 }));
@@ -55,6 +61,7 @@ const ENTITY_OPTIONS = [
 function useLeadMutations(leadId: string) {
 	const trpc = useTRPC();
 	const queryClient = useQueryClient();
+	const cache = useCrmCache();
 
 	const refresh = () => {
 		void queryClient.invalidateQueries({
@@ -88,20 +95,32 @@ function useLeadMutations(leadId: string) {
 		}),
 	);
 
-	return { update, assign, refresh };
+	const convert = useMutation(
+		trpc.leads.convert.mutationOptions({
+			onSuccess: (result) => {
+				refresh();
+				void cache.company(result.companyId);
+				void cache.contact(result.contactId);
+			},
+			onError: (error) => toast.error(error.message),
+		}),
+	);
+
+	return { update, assign, convert, refresh };
 }
 
 export function LeadSheet({ leadId }: { leadId: string }) {
 	const trpc = useTRPC();
 	const queryClient = useQueryClient();
 	const { closeAll } = useRecordStack();
+	const openRecord = useOpenRecord();
 	const { tab, setTab } = useRecordSheetView("overview");
 
 	const query = useQuery(trpc.leads.byId.queryOptions({ id: leadId }));
 	const owners = useQuery(trpc.leads.owners.queryOptions());
 	const lead = query.data;
 
-	const { update, assign } = useLeadMutations(leadId);
+	const { update, assign, convert } = useLeadMutations(leadId);
 
 	const archive = useMutation(
 		trpc.leads.remove.mutationOptions({
@@ -170,6 +189,41 @@ export function LeadSheet({ leadId }: { leadId: string }) {
 							email={lead.email}
 							phone={lead.phone}
 						/>
+						{lead.convertedAt && lead.companyId ? (
+							<Button
+								onClick={() =>
+									openRecord({ kind: "company", id: lead.companyId as string })
+								}
+								size="sm"
+								variant="outline"
+							>
+								<Icon data-icon="inline-start" icon={Enterprise} />
+								Open account
+							</Button>
+						) : (
+							<Button
+								disabled={convert.isPending}
+								onClick={() =>
+									convert.mutate(
+										{ id: lead.id },
+										{
+											onSuccess: (result) => {
+												toast.success("Converted to an account.");
+												openRecord({ kind: "company", id: result.companyId });
+											},
+										},
+									)
+								}
+								size="sm"
+							>
+								{convert.isPending ? (
+									<Spinner data-icon="inline-start" />
+								) : (
+									<Icon data-icon="inline-start" icon={Enterprise} />
+								)}
+								Convert
+							</Button>
+						)}
 						<Button
 							disabled={archive.isPending}
 							onClick={() => archive.mutate({ id: lead.id })}
@@ -241,7 +295,7 @@ function LeadOverview({
 				<div className="rounded-2xl border bg-muted/20 p-4">
 					<DetailSheetProperties>
 						<InlineSelectField
-							label="Stage"
+							label="Status"
 							onSave={(next) => onUpdate({ stage: next })}
 							options={STAGE_OPTIONS}
 							saving={saving}
@@ -257,7 +311,7 @@ function LeadOverview({
 						/>
 
 						<InlineSelectField
-							label="Type"
+							label="Lead category"
 							onSave={(next) => onUpdate({ kind: next })}
 							options={KIND_OPTIONS}
 							saving={saving}
@@ -273,12 +327,24 @@ function LeadOverview({
 							saving={saving}
 							value={lead.entity ?? UNSET}
 						/>
-						<DetailSheetProperty label="In this stage since">
+						<InlineTextCell
+							label="Next action"
+							onSave={(next) => onUpdate({ nextAction: next })}
+							placeholder="What happens next?"
+							saving={saving}
+							value={lead.nextAction}
+						/>
+						<DetailSheetProperty label="In this status since">
 							<LocalRelativeTime date={lead.stageChangedAt} />
 						</DetailSheetProperty>
 						<DetailSheetProperty label="Created">
 							<LocalRelativeTime date={lead.createdAt} />
 						</DetailSheetProperty>
+						{lead.convertedAt ? (
+							<DetailSheetProperty label="Converted">
+								<LocalRelativeTime date={lead.convertedAt} />
+							</DetailSheetProperty>
+						) : null}
 					</DetailSheetProperties>
 				</div>
 			</DetailSheetSection>
@@ -286,6 +352,18 @@ function LeadOverview({
 			<DetailSheetSection className="py-5" title="Contact details">
 				<div className="rounded-2xl border bg-card p-4 shadow-xs">
 					<DetailSheetProperties>
+						{(LEAD_BOARD.designationKinds as readonly string[]).includes(
+							lead.kind,
+						) ? (
+							<InlineTextCell
+								label="Designation / role"
+								onSave={(next) => onUpdate({ designation: next })}
+								placeholder="Add a designation"
+								saving={saving}
+								value={lead.designation}
+							/>
+						) : null}
+
 						<InlineTextCell
 							label="Company"
 							onSave={(next) => onUpdate({ companyName: next })}
@@ -303,13 +381,51 @@ function LeadOverview({
 						/>
 
 						<InlineTextCell
-							label="Phone"
+							label="Secondary email"
+							onSave={(next) => onUpdate({ secondaryEmail: next })}
+							placeholder="Add an email"
+							saving={saving}
+							value={lead.secondaryEmail}
+						/>
+
+						<InlineTextCell
+							label="Mobile number"
 							onSave={(next) => onUpdate({ phone: next })}
 							placeholder="Add a phone number"
 							saving={saving}
 							value={lead.phone}
 						/>
 
+						<InlineTextCell
+							label="Secondary phone"
+							onSave={(next) => onUpdate({ secondaryPhone: next })}
+							placeholder="Add a phone number"
+							saving={saving}
+							value={lead.secondaryPhone}
+						/>
+
+						<InlineTextCell
+							label="Website"
+							onSave={(next) => onUpdate({ website: next })}
+							placeholder="Add a website"
+							saving={saving}
+							value={lead.website}
+						/>
+
+						<InlineTextCell
+							label="Lead source"
+							onSave={(next) => onUpdate({ source: next })}
+							placeholder="Add a source"
+							saving={saving}
+							value={lead.source}
+						/>
+					</DetailSheetProperties>
+				</div>
+			</DetailSheetSection>
+
+			<DetailSheetSection className="py-5" title="Address">
+				<div className="rounded-2xl border bg-card p-4 shadow-xs">
+					<DetailSheetProperties>
 						<InlineTextCell
 							label="Country"
 							onSave={(next) => onUpdate({ country: next })}
@@ -319,11 +435,19 @@ function LeadOverview({
 						/>
 
 						<InlineTextCell
-							label="Source"
-							onSave={(next) => onUpdate({ source: next })}
-							placeholder="Add a source"
+							label="State"
+							onSave={(next) => onUpdate({ state: next })}
+							placeholder="Add a state"
 							saving={saving}
-							value={lead.source}
+							value={lead.state}
+						/>
+
+						<InlineTextCell
+							label="Address"
+							onSave={(next) => onUpdate({ address: next })}
+							placeholder="Add an address"
+							saving={saving}
+							value={lead.address}
 						/>
 					</DetailSheetProperties>
 				</div>

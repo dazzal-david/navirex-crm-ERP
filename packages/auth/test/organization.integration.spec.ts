@@ -1,5 +1,11 @@
 import { afterAll, beforeEach, describe, expect, it } from "bun:test";
 import { db } from "@crm/db";
+import {
+	INVITE_STATUS,
+	INVITES,
+	NotInvitedError,
+	newInviteToken,
+} from "../src/invitations";
 import { ensureWorkspaceMembership, WORKSPACE_ID } from "../src/organization";
 
 const suffix = process.env.TEST_RUN_ID ?? "organization-spec";
@@ -33,7 +39,26 @@ const roleOf = async (userId: string): Promise<string | null> => {
 	return member?.role ?? null;
 };
 
+const invite = async (label: string, role: string, expiresAt?: Date) => {
+	const { id } = newInviteToken();
+	await db.invitation.create({
+		data: {
+			id,
+			organizationId: WORKSPACE_ID,
+			email: emailOf(label),
+			role,
+			status: INVITE_STATUS.pending,
+			expiresAt: expiresAt ?? new Date(Date.now() + INVITES.ttlMs),
+			inviterId: firstId,
+		},
+	});
+	return id;
+};
+
 const clear = async () => {
+	await db.invitation.deleteMany({
+		where: { email: { endsWith: `.${suffix}@example.test` } },
+	});
 	await db.member.deleteMany({
 		where: { userId: { startsWith: `${suffix}-` } },
 	});
@@ -94,18 +119,63 @@ describe("ensureWorkspaceMembership", () => {
 		expect(rows[0]?.role).toBe("admin");
 	});
 
-	it("joins someone who signs up later as a member", async () => {
+	it("refuses someone who arrives later without an invitation", async () => {
 		await ensureWorkspaceMembership(secondId);
+
+		const laterId = await seedUser("later", new Date("2026-01-01T00:00:00Z"));
+
+		await expect(ensureWorkspaceMembership(laterId)).rejects.toBeInstanceOf(
+			NotInvitedError,
+		);
+		expect(await roleOf(laterId)).toBeNull();
+	});
+
+	it("refuses an expired invitation", async () => {
+		await ensureWorkspaceMembership(secondId);
+		await invite("later", "member", new Date(Date.now() - 1000));
+
+		const laterId = await seedUser("later", new Date("2026-01-01T00:00:00Z"));
+
+		await expect(ensureWorkspaceMembership(laterId)).rejects.toBeInstanceOf(
+			NotInvitedError,
+		);
+	});
+
+	it("joins an invited person with the invited role and uses up the invitation", async () => {
+		await ensureWorkspaceMembership(secondId);
+		const invitationId = await invite("later", "manager");
 
 		const laterId = await seedUser("later", new Date("2026-01-01T00:00:00Z"));
 
 		await ensureWorkspaceMembership(laterId);
 
-		expect(await roleOf(laterId)).toBe("member");
+		expect(await roleOf(laterId)).toBe("manager");
+		const used = await db.invitation.findUnique({
+			where: { id: invitationId },
+			select: { status: true },
+		});
+		expect(used?.status).toBe(INVITE_STATUS.accepted);
+	});
+
+	it("refuses a removed member who signs in again", async () => {
+		await ensureWorkspaceMembership(secondId);
+		await db.member.delete({
+			where: {
+				organizationId_userId: {
+					organizationId: WORKSPACE_ID,
+					userId: secondId,
+				},
+			},
+		});
+
+		await expect(ensureWorkspaceMembership(secondId)).rejects.toBeInstanceOf(
+			NotInvitedError,
+		);
 	});
 
 	it("leaves the owner alone when a later arrival signs in", async () => {
 		await ensureWorkspaceMembership(secondId);
+		await invite("later", "member");
 
 		const laterId = await seedUser("later", new Date("2026-01-01T00:00:00Z"));
 

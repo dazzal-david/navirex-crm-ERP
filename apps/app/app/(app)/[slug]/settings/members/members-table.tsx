@@ -1,8 +1,16 @@
 "use client";
 
-import Add from "@carbon/icons-react/es/Add";
-import Copy from "@carbon/icons-react/es/Copy";
 import OverflowMenuHorizontal from "@carbon/icons-react/es/OverflowMenuHorizontal";
+import {
+	AlertDialog,
+	AlertDialogAction,
+	AlertDialogCancel,
+	AlertDialogContent,
+	AlertDialogDescription,
+	AlertDialogFooter,
+	AlertDialogHeader,
+	AlertDialogTitle,
+} from "@crm/ui/components/alert-dialog";
 import { Button } from "@crm/ui/components/button";
 import {
 	DataTable,
@@ -10,23 +18,16 @@ import {
 	type DataTableFacet,
 } from "@crm/ui/components/data-table";
 import {
-	Dialog,
-	DialogContent,
-	DialogDescription,
-	DialogFooter,
-	DialogHeader,
-	DialogTitle,
-	DialogTrigger,
-} from "@crm/ui/components/dialog";
-import {
 	DropdownMenu,
 	DropdownMenuContent,
 	DropdownMenuItem,
+	DropdownMenuSeparator,
 	DropdownMenuTrigger,
 } from "@crm/ui/components/dropdown-menu";
 import { Icon } from "@crm/ui/components/icon";
 import { PersonAvatar } from "@crm/ui/components/person-avatar";
 import { useMutation, useQuery } from "@tanstack/react-query";
+import { useState } from "react";
 import { toast } from "sonner";
 import { ListSearch } from "@/components/data-table/list-search";
 import { useTableQuery } from "@/components/data-table/use-table-query";
@@ -34,6 +35,7 @@ import { LocalRelativeTime } from "@/components/local-date-time";
 import { useCrmCache } from "@/lib/trpc/cache";
 import { useTRPC } from "@/lib/trpc/client";
 import type { RouterOutputs } from "@/lib/trpc/types";
+import { InviteMember, PendingInvitations } from "./invite-member";
 import { membersSearchParams } from "./members-search-params";
 
 const ROLE_LABEL = {
@@ -50,6 +52,7 @@ type MemberRow = RouterOutputs["workspace"]["members"]["rows"][number];
 function columns(
 	canChangeRoles: boolean,
 	onChangeRole: (member: MemberRow, role: Role) => void,
+	onRemove: (member: MemberRow) => void,
 	pending: boolean,
 ): DataTableColumn<MemberRow>[] {
 	return [
@@ -137,6 +140,17 @@ function columns(
 									{ROLE_LABEL[role]}
 								</DropdownMenuItem>
 							))}
+							{!row.isViewer && row.role !== "owner" ? (
+								<>
+									<DropdownMenuSeparator />
+									<DropdownMenuItem
+										onSelect={() => onRemove(row)}
+										variant="destructive"
+									>
+										Remove from workspace
+									</DropdownMenuItem>
+								</>
+							) : null}
 						</DropdownMenuContent>
 					</DropdownMenu>
 				) : null,
@@ -165,6 +179,19 @@ export function MembersTable() {
 		}),
 	);
 
+	const [removing, setRemoving] = useState<MemberRow | null>(null);
+
+	const remove = useMutation(
+		trpc.invitations.removeMember.mutationOptions({
+			onSuccess: async () => {
+				await cache.workspace();
+				toast.success("Member removed and signed out.");
+			},
+			onError: (error) => toast.error(error.message),
+			onSettled: () => setRemoving(null),
+		}),
+	);
+
 	const facetCounts = members.data?.facetCounts;
 
 	const facets: DataTableFacet[] = [
@@ -181,14 +208,48 @@ export function MembersTable() {
 
 	return (
 		<div className="flex min-h-0 flex-1 flex-col gap-4">
-			{workspace.data?.canChangeRoles ? <MemberSetup /> : null}
+			{workspace.data?.canChangeRoles ? (
+				<>
+					<InviteMember />
+					<PendingInvitations />
+				</>
+			) : null}
+			<AlertDialog
+				open={removing !== null}
+				onOpenChange={(open) => {
+					if (!open) setRemoving(null);
+				}}
+			>
+				<AlertDialogContent>
+					<AlertDialogHeader>
+						<AlertDialogTitle>Remove {removing?.name}?</AlertDialogTitle>
+						<AlertDialogDescription>
+							{removing?.email} loses access and is signed out. They can only
+							come back with a new invitation. Their records stay in the CRM.
+						</AlertDialogDescription>
+					</AlertDialogHeader>
+					<AlertDialogFooter>
+						<AlertDialogCancel>Cancel</AlertDialogCancel>
+						<AlertDialogAction
+							disabled={remove.isPending}
+							onClick={() => {
+								if (removing) remove.mutate({ memberId: removing.id });
+							}}
+							variant="destructive"
+						>
+							Remove
+						</AlertDialogAction>
+					</AlertDialogFooter>
+				</AlertDialogContent>
+			</AlertDialog>
 			<DataTable
 				query={query}
 				search={<ListSearch placeholder="Search by name or email…" />}
 				columns={columns(
 					workspace.data?.canChangeRoles ?? false,
 					(member, role) => setRole.mutate({ memberId: member.id, role }),
-					setRole.isPending,
+					setRemoving,
+					setRole.isPending || remove.isPending,
 				)}
 				rows={members.data?.rows ?? []}
 				total={members.data?.total ?? 0}
@@ -198,61 +259,6 @@ export function MembersTable() {
 				loading={members.isFetching}
 				empty="Nobody matches this view."
 			/>
-		</div>
-	);
-}
-
-function MemberSetup() {
-	async function copySignUpLink() {
-		await navigator.clipboard.writeText(`${window.location.origin}/sign-in`);
-		toast.success("Sign-up link copied.");
-	}
-
-	return (
-		<div className="flex flex-col justify-between gap-3 rounded-lg border bg-card p-4 sm:flex-row sm:items-center">
-			<div>
-				<p className="font-medium text-sm">Add Navirex employees</p>
-				<p className="text-muted-foreground text-sm">
-					Employees create their own secure account, then appear in this list.
-				</p>
-			</div>
-			<Dialog>
-				<DialogTrigger asChild>
-					<Button size="sm">
-						<Add data-icon="inline-start" />
-						Add member
-					</Button>
-				</DialogTrigger>
-				<DialogContent>
-					<DialogHeader>
-						<DialogTitle>Add an employee</DialogTitle>
-						<DialogDescription>
-							Share the secure sign-up link with an approved employee.
-						</DialogDescription>
-					</DialogHeader>
-					<ol className="list-decimal space-y-2 pl-5 text-sm">
-						<li>Add their email or company domain to ALLOWED_SIGN_IN.</li>
-						<li>Ask them to create an account with the link below.</li>
-						<li>After their first sign-in, assign their role here.</li>
-					</ol>
-					<div className="rounded-md border bg-muted/40 px-3 py-2 font-mono text-xs">
-						/sign-in
-					</div>
-					<DialogFooter>
-						<Button
-							onClick={() => {
-								copySignUpLink().catch(() =>
-									toast.error("Could not copy the sign-up link."),
-								);
-							}}
-							type="button"
-						>
-							<Copy data-icon="inline-start" />
-							Copy sign-up link
-						</Button>
-					</DialogFooter>
-				</DialogContent>
-			</Dialog>
 		</div>
 	);
 }

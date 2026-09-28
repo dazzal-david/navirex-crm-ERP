@@ -90,11 +90,11 @@ export function LeadBoard() {
 
 				if (!moved) return { previousBoard, previousColumns };
 
-				const visible = isVisibleAfterMove(filters, input.stage);
+				const visible = true;
 				const card: LeadCard = {
 					...moved,
 					stage: input.stage,
-					owner: input.stage === "UNASSIGNED" ? null : moved.owner,
+					owner: moved.owner,
 				};
 
 				queryClient.setQueryData<BoardData>(options.queryKey, (old) =>
@@ -541,13 +541,6 @@ function findLead(
 		.flatMap((column) => column.data?.pages ?? [])
 		.flatMap((page) => page.leads)
 		.find((lead) => lead.id === id);
-}
-
-function isVisibleAfterMove(
-	filters: LeadFilterInput,
-	stage: LeadStage,
-): boolean {
-	return stage !== "UNASSIGNED" || (!filters.mine && !filters.ownerId);
 }
 
 function moveBoardCard(

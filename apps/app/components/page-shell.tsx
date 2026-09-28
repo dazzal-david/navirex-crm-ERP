@@ -40,12 +40,12 @@ function PageShellHeader({
 		<header
 			data-slot="page-shell-header"
 			className={cn(
-				"flex flex-col gap-3 [view-transition-name:page-header]",
+				"flex flex-col [view-transition-name:page-header]",
 				className,
 			)}
 			{...props}
 		>
-			<div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-2">
+			<div className="grid min-h-9 grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4">
 				{children}
 			</div>
 		</header>
@@ -70,7 +70,7 @@ function PageShellTitle({ className, ...props }: React.ComponentProps<"h1">) {
 		<h1
 			data-slot="page-shell-title"
 			className={cn(
-				"col-start-1 row-start-1 min-w-0 self-center text-balance font-medium text-2xl tracking-tight md:text-3xl",
+				"col-start-1 row-start-1 min-w-0 self-center truncate font-medium text-lg tracking-tight",
 				className,
 			)}
 			{...props}
@@ -78,20 +78,8 @@ function PageShellTitle({ className, ...props }: React.ComponentProps<"h1">) {
 	);
 }
 
-function PageShellDescription({
-	className,
-	...props
-}: React.ComponentProps<"p">) {
-	return (
-		<p
-			data-slot="page-shell-description"
-			className={cn(
-				"col-span-full row-start-2 text-balance text-muted-foreground text-sm",
-				className,
-			)}
-			{...props}
-		/>
-	);
+function PageShellDescription(_props: React.ComponentProps<"p">) {
+	return null;
 }
 
 function PageShellActions({

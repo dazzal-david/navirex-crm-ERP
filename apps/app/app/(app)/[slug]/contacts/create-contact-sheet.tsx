@@ -23,6 +23,7 @@ import {
 	SheetTrigger,
 } from "@crm/ui/components/sheet";
 import { Spinner } from "@crm/ui/components/spinner";
+import { Textarea } from "@crm/ui/components/textarea";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { parseAsBoolean, useQueryState } from "nuqs";
 import { type ComponentProps, Suspense, useId, useState } from "react";
@@ -64,14 +65,20 @@ function CreateContactForm({ companyId }: { companyId?: string }) {
 	const [firstName, setFirstName] = useState("");
 	const [lastName, setLastName] = useState("");
 	const [email, setEmail] = useState("");
+	const [phone, setPhone] = useState("");
+	const [secondaryPhone, setSecondaryPhone] = useState("");
 	const [title, setTitle] = useState("");
+	const [notes, setNotes] = useState("");
 	const [company, setCompany] = useState(companyId ?? NONE);
 	const [ownerId, setOwnerId] = useState(NONE);
 
 	const firstNameId = useId();
 	const lastNameId = useId();
 	const emailId = useId();
+	const phoneId = useId();
+	const secondaryPhoneId = useId();
 	const titleId = useId();
+	const notesId = useId();
 
 	const users = useQuery(trpc.users.list.queryOptions());
 
@@ -86,7 +93,10 @@ function CreateContactForm({ companyId }: { companyId?: string }) {
 				setFirstName("");
 				setLastName("");
 				setEmail("");
+				setPhone("");
+				setSecondaryPhone("");
 				setTitle("");
+				setNotes("");
 				openRecord({ kind: "contact", id: contact.id });
 			},
 			onError: (error) => toast.error(error.message),
@@ -102,8 +112,8 @@ function CreateContactForm({ companyId }: { companyId?: string }) {
 				<SheetHeader>
 					<SheetTitle>New contact</SheetTitle>
 					<SheetDescription>
-						Email addresses are unique, so importing the same person twice
-						updates them rather than duplicating them.
+						Fields marked * are required. Email addresses are unique, so the
+						same person cannot be added twice.
 					</SheetDescription>
 				</SheetHeader>
 
@@ -112,19 +122,26 @@ function CreateContactForm({ companyId }: { companyId?: string }) {
 					className="flex-1 overflow-y-auto px-4"
 					onSubmit={(event) => {
 						event.preventDefault();
+						if (company === NONE) {
+							toast.error("Choose the account this contact works at.");
+							return;
+						}
 						create.mutate({
 							firstName,
 							lastName: lastName || undefined,
 							email: email || undefined,
+							phone,
+							secondaryPhone: secondaryPhone || undefined,
 							title: title || undefined,
-							companyId: company === NONE ? null : company,
+							notes: notes || undefined,
+							companyId: company,
 							ownerId: ownerId === NONE ? null : ownerId,
 						});
 					}}
 				>
 					<FieldGroup>
 						<Field>
-							<FieldLabel htmlFor={firstNameId}>First name</FieldLabel>
+							<FieldLabel htmlFor={firstNameId}>First name *</FieldLabel>
 							<Input
 								id={firstNameId}
 								value={firstName}
@@ -145,6 +162,55 @@ function CreateContactForm({ companyId }: { companyId?: string }) {
 						</Field>
 
 						<Field>
+							<FieldLabel htmlFor="create-contact-company">
+								Account name *
+							</FieldLabel>
+							<CompanyPicker
+								id="create-contact-company"
+								value={company}
+								onValueChange={setCompany}
+								none={{ value: NONE, label: "Choose an account" }}
+							/>
+						</Field>
+
+						<Field>
+							<FieldLabel htmlFor={titleId}>Designation</FieldLabel>
+							<Input
+								id={titleId}
+								value={title}
+								onChange={(event) => setTitle(event.target.value)}
+								placeholder="e.g. Director"
+								autoComplete="off"
+							/>
+						</Field>
+
+						<Field>
+							<FieldLabel htmlFor={phoneId}>Phone number *</FieldLabel>
+							<Input
+								id={phoneId}
+								type="tel"
+								value={phone}
+								onChange={(event) => setPhone(event.target.value)}
+								placeholder="+91 …"
+								autoComplete="off"
+								required
+							/>
+						</Field>
+
+						<Field>
+							<FieldLabel htmlFor={secondaryPhoneId}>
+								Secondary phone number
+							</FieldLabel>
+							<Input
+								id={secondaryPhoneId}
+								type="tel"
+								value={secondaryPhone}
+								onChange={(event) => setSecondaryPhone(event.target.value)}
+								autoComplete="off"
+							/>
+						</Field>
+
+						<Field>
 							<FieldLabel htmlFor={emailId}>Email</FieldLabel>
 							<Input
 								id={emailId}
@@ -156,23 +222,12 @@ function CreateContactForm({ companyId }: { companyId?: string }) {
 						</Field>
 
 						<Field>
-							<FieldLabel htmlFor={titleId}>Title</FieldLabel>
-							<Input
-								id={titleId}
-								value={title}
-								onChange={(event) => setTitle(event.target.value)}
-								placeholder="Head of Security"
-								autoComplete="off"
-							/>
-						</Field>
-
-						<Field>
-							<FieldLabel htmlFor="create-contact-company">Company</FieldLabel>
-							<CompanyPicker
-								id="create-contact-company"
-								value={company}
-								onValueChange={setCompany}
-								none={{ value: NONE, label: "No company" }}
+							<FieldLabel htmlFor={notesId}>Notes</FieldLabel>
+							<Textarea
+								id={notesId}
+								value={notes}
+								onChange={(event) => setNotes(event.target.value)}
+								rows={3}
 							/>
 						</Field>
 
@@ -199,7 +254,12 @@ function CreateContactForm({ companyId }: { companyId?: string }) {
 					<Button
 						type="submit"
 						form="create-contact"
-						disabled={create.isPending || firstName.trim() === ""}
+						disabled={
+							create.isPending ||
+							firstName.trim() === "" ||
+							phone.trim() === "" ||
+							company === NONE
+						}
 					>
 						{create.isPending ? <Spinner /> : null}
 						Add contact

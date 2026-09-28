@@ -19,6 +19,11 @@ agent and the API both need it.
 - **`lib/model.ts` always sends `modelContextWindowTokens`**; eve never inherits it.
 - **A failed read logs and keeps the compiled fallback.** Never throws.
 - **The chooser offers only `tool-use` models** (`ModelCatalogService`).
+- **`OPENROUTER_API_KEY` routes every model call to OpenRouter instead.**
+  `openRouterModel()` (`lib/model.ts`) answers `step.started` in all three agents,
+  and step beats session, so it overrides the settings-page choice. A live
+  `LanguageModel` is only allowed from `step.started`. `OPENROUTER` in the same file
+  holds the default free model and its fallbacks; `OPENROUTER_MODEL` overrides it.
 - **Not a frontier model, deliberately** — refusing wrong answers is enforced by the
   tools and evidence model, not model strength.
 

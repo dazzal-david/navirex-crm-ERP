@@ -27,7 +27,8 @@ import { enrichmentQueueInput } from "@crm/validation/enrichment-queue";
 import { fieldListInput, fieldListOutput, fieldByKeyInput, serializedFieldOutput, fieldEntityInput, fieldFiltersOutput, fieldIdInput, fieldCoverageOutput, fieldCreateInput, fieldUpdateArgs, fieldReorderInput, fieldReorderOutput, fieldDeleteOutput, fieldBackfillOutput } from "../fields/fields.contracts";
 import { googleConnectionStatusOutput, setAutoCreateInput, suppressDomainInput, suppressDomainOutput, threadInput, emailThreadOutput, calendarEventInput, calendarEventOutput } from "../google/google.contracts";
 import { purgeSyncedDataOutput, revokeAccessOutput, microsoftConnectionStatusOutput, setOutlookAutoCreateInput } from "../microsoft/microsoft.contracts";
-import { boardInput, boardOutput, columnPageInput, columnPageOutput, leadListInput, leadListOutput, leadIdInput, leadDetailOutput, leadOwnersOutput, leadCreateInput, leadMutateOutput, leadIntakeInput, leadIntakeOutput, zohoImportInput, zohoImportOutput, leadUpdateInput, leadMoveInput, leadAssignInput, leadDeleteOutput } from "../leads/leads.contracts";
+import { invitationsOutput, inviteInput, inviteOutput, invitationIdInput, invitationOutput, removeMemberInput, removeMemberOutput } from "../invitations/invitations.contracts";
+import { boardInput, boardOutput, columnPageInput, columnPageOutput, leadListInput, leadListOutput, leadIdInput, leadDetailOutput, leadOwnersOutput, leadCreateInput, leadMutateOutput, leadIntakeInput, leadIntakeOutput, zohoImportInput, zohoImportOutput, leadUpdateInput, leadMoveInput, leadAssignInput, leadConvertOutput, leadDeleteOutput } from "../leads/leads.contracts";
 import { metaStatusOutput, metaAvailablePagesOutput, metaPageInput, metaMutationOutput, metaSyncOutput } from "../meta/meta.contracts";
 import { employeePortalOutput, directoryOutput, updateMyProfileInput, employeeProfileOutput, updateEmployeeInput, reimbursementsOutput, submitReimbursementInput, reimbursementOutput, reviewReimbursementInput, reimbursementIdInput } from "../people/people.contracts";
 import { savedViewListInput, savedViewListOutput, savedViewCreateInput, savedViewOutput, savedViewUpdateArgs, savedViewIdInput, savedViewDeleteOutput } from "../saved-views/saved-views.contracts";
@@ -592,6 +593,23 @@ const appRouter = t.router({
       .output(calendarEventOutput)
       .query(async () => "PLACEHOLDER_DO_NOT_REMOVE" as any)
     }),
+  invitations: t.router({
+    list: publicProcedure
+      .output(invitationsOutput)
+      .query(async () => "PLACEHOLDER_DO_NOT_REMOVE" as any),
+    invite: publicProcedure
+      .input(inviteInput)
+      .output(inviteOutput)
+      .mutation(async () => "PLACEHOLDER_DO_NOT_REMOVE" as any),
+    revoke: publicProcedure
+      .input(invitationIdInput)
+      .output(invitationOutput)
+      .mutation(async () => "PLACEHOLDER_DO_NOT_REMOVE" as any),
+    removeMember: publicProcedure
+      .input(removeMemberInput)
+      .output(removeMemberOutput)
+      .mutation(async () => "PLACEHOLDER_DO_NOT_REMOVE" as any)
+    }),
   leads: t.router({
     board: publicProcedure
       .input(boardInput)
@@ -635,6 +653,10 @@ const appRouter = t.router({
     assign: publicProcedure
       .input(leadAssignInput)
       .output(leadMutateOutput)
+      .mutation(async () => "PLACEHOLDER_DO_NOT_REMOVE" as any),
+    convert: publicProcedure
+      .input(leadIdInput)
+      .output(leadConvertOutput)
       .mutation(async () => "PLACEHOLDER_DO_NOT_REMOVE" as any),
     remove: publicProcedure
       .input(leadIdInput)

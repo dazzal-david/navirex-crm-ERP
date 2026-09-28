@@ -29,10 +29,10 @@ const DAY_LABEL = new Intl.DateTimeFormat("en-US", {
 });
 
 const ACTIVE_LEAD_STAGES = [
-	LeadStage.UNASSIGNED,
-	LeadStage.ASSIGNED,
-	LeadStage.TALKING,
+	LeadStage.NOT_CONTACTED,
+	LeadStage.CONTACTED,
 	LeadStage.INTERESTED,
+	LeadStage.FOLLOW_UP,
 ] as const;
 const ACTIVE_LEAD_STAGE_SET = new Set<LeadStage>(ACTIVE_LEAD_STAGES);
 
@@ -340,6 +340,7 @@ export class DashboardService {
 			createdLeads,
 			newThisWeek,
 			newPreviousWeek,
+			unassigned,
 			needsAttention,
 			priorityLeads,
 			overdueTasks,
@@ -371,6 +372,13 @@ export class DashboardService {
 				where: {
 					...leadWhere,
 					createdAt: { gte: previousWeekStart, lt: thisWeekStart },
+				},
+			}),
+			this.db.lead.count({
+				where: {
+					...leadWhere,
+					ownerId: null,
+					stage: { in: [...ACTIVE_LEAD_STAGES] },
 				},
 			}),
 			this.db.lead.count({ where: needsAttentionWhere }),
@@ -458,9 +466,7 @@ export class DashboardService {
 			totals: {
 				all: total,
 				active,
-				unassigned:
-					stages.find((stage) => stage.stage === LeadStage.UNASSIGNED)?.count ??
-					0,
+				unassigned,
 				needsAttention,
 				newThisWeek,
 				newPreviousWeek,

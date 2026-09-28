@@ -23,24 +23,41 @@ import {
 } from "@crm/ui/components/sheet";
 import { Spinner } from "@crm/ui/components/spinner";
 import { Textarea } from "@crm/ui/components/textarea";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { toast } from "sonner";
+import { LEAD_BOARD } from "@/lib/leads/board-config";
 import { useTRPC } from "@/lib/trpc/client";
+
+type LeadKind = (typeof LEAD_BOARD.kinds)[number];
+type LeadStage = (typeof LEAD_BOARD.stages)[number];
+
+const NONE = "NONE";
 
 export function CreateLeadSheet() {
 	const trpc = useTRPC();
 	const queryClient = useQueryClient();
 
 	const [open, setOpen] = useState(false);
-	const [kind, setKind] = useState("EPC");
-	const [entity, setEntity] = useState("NONE");
+	const [kind, setKind] = useState<LeadKind>("EPC");
+	const [entity, setEntity] = useState(NONE);
+	const [ownerId, setOwnerId] = useState(NONE);
+	const [stage, setStage] = useState<LeadStage>("NOT_CONTACTED");
+
+	const owners = useQuery(trpc.leads.owners.queryOptions());
+	const hasDesignation = (
+		LEAD_BOARD.designationKinds as readonly string[]
+	).includes(kind);
 
 	const create = useMutation(
 		trpc.leads.create.mutationOptions({
 			onSuccess: (lead) => {
-				toast.success(`${lead.name} added to Unassigned.`);
+				toast.success(`${lead.name} added to ${LEAD_BOARD.label[lead.stage]}.`);
 				setOpen(false);
+				setKind("EPC");
+				setEntity(NONE);
+				setOwnerId(NONE);
+				setStage("NOT_CONTACTED");
 				void Promise.all([
 					queryClient.invalidateQueries({
 						queryKey: trpc.leads.board.queryKey(),
@@ -73,7 +90,8 @@ export function CreateLeadSheet() {
 				<SheetHeader>
 					<SheetTitle>New lead</SheetTitle>
 					<SheetDescription>
-						It lands in Unassigned until somebody picks it up.
+						Fields marked * are required. Everything else can be filled in later
+						from the lead.
 					</SheetDescription>
 				</SheetHeader>
 
@@ -89,57 +107,86 @@ export function CreateLeadSheet() {
 						};
 
 						const name = text("name");
-						if (!name) return;
+						const companyName = text("companyName");
+						const phone = text("phone");
+						if (!name || !companyName || !phone) return;
 
 						create.mutate({
+							kind,
 							name,
-							companyName: text("companyName"),
+							designation: hasDesignation ? text("designation") : undefined,
+							companyName,
+							entity:
+								entity === NONE ? undefined : (entity as "INDIA" | "GERMANY"),
+							phone,
+							secondaryPhone: text("secondaryPhone"),
 							email: text("email"),
-							phone: text("phone"),
+							secondaryEmail: text("secondaryEmail"),
+							website: text("website"),
 							source: text("source"),
 							country: text("country"),
+							state: text("state"),
+							address: text("address"),
+							nextAction: text("nextAction"),
+							ownerId: ownerId === NONE ? undefined : ownerId,
+							stage,
 							notes: text("notes"),
-							kind: kind as "EPC" | "CUSTOMER" | "OTHER",
-							entity:
-								entity === "NONE" ? undefined : (entity as "INDIA" | "GERMANY"),
-							stage: "UNASSIGNED",
 						});
 					}}
 				>
 					<div className="min-h-0 flex-1 overflow-y-auto px-4">
 						<FieldGroup>
 							<Field>
-								<FieldLabel htmlFor="lead-name">Name</FieldLabel>
-								<Input
-									autoFocus
-									id="lead-name"
-									name="name"
-									placeholder="Contact or organisation"
-									required
-								/>
-							</Field>
-
-							<Field>
-								<FieldLabel htmlFor="lead-company">Company</FieldLabel>
-								<Input
-									id="lead-company"
-									name="companyName"
-									placeholder="e.g. Tata Power Solar"
-								/>
-							</Field>
-
-							<Field>
-								<FieldLabel htmlFor="lead-kind">Type</FieldLabel>
-								<Select onValueChange={setKind} value={kind}>
+								<FieldLabel htmlFor="lead-kind">Lead category *</FieldLabel>
+								<Select
+									onValueChange={(next) => setKind(next as LeadKind)}
+									value={kind}
+								>
 									<SelectTrigger id="lead-kind">
 										<SelectValue />
 									</SelectTrigger>
 									<SelectContent>
-										<SelectItem value="EPC">EPC</SelectItem>
-										<SelectItem value="CUSTOMER">Customer</SelectItem>
-										<SelectItem value="OTHER">Other</SelectItem>
+										{LEAD_BOARD.kinds.map((option) => (
+											<SelectItem key={option} value={option}>
+												{LEAD_BOARD.kind[option]}
+											</SelectItem>
+										))}
 									</SelectContent>
 								</Select>
+							</Field>
+
+							<Field>
+								<FieldLabel htmlFor="lead-name">Name *</FieldLabel>
+								<Input
+									autoFocus
+									id="lead-name"
+									name="name"
+									placeholder="Person you are talking to"
+									required
+								/>
+							</Field>
+
+							{hasDesignation ? (
+								<Field>
+									<FieldLabel htmlFor="lead-designation">
+										Designation / role
+									</FieldLabel>
+									<Input
+										id="lead-designation"
+										name="designation"
+										placeholder="e.g. Procurement head"
+									/>
+								</Field>
+							) : null}
+
+							<Field>
+								<FieldLabel htmlFor="lead-company">Company *</FieldLabel>
+								<Input
+									id="lead-company"
+									name="companyName"
+									placeholder="e.g. Tata Power Solar"
+									required
+								/>
 							</Field>
 
 							<Field>
@@ -149,11 +196,36 @@ export function CreateLeadSheet() {
 										<SelectValue />
 									</SelectTrigger>
 									<SelectContent>
-										<SelectItem value="NONE">Not set</SelectItem>
-										<SelectItem value="INDIA">Navirex India</SelectItem>
-										<SelectItem value="GERMANY">Navirex Germany</SelectItem>
+										<SelectItem value={NONE}>Not set</SelectItem>
+										{LEAD_BOARD.entities.map((option) => (
+											<SelectItem key={option} value={option}>
+												{LEAD_BOARD.entityName[option]}
+											</SelectItem>
+										))}
 									</SelectContent>
 								</Select>
+							</Field>
+
+							<Field>
+								<FieldLabel htmlFor="lead-phone">Mobile number *</FieldLabel>
+								<Input
+									id="lead-phone"
+									name="phone"
+									placeholder="+91 …"
+									required
+									type="tel"
+								/>
+							</Field>
+
+							<Field>
+								<FieldLabel htmlFor="lead-secondary-phone">
+									Secondary phone
+								</FieldLabel>
+								<Input
+									id="lead-secondary-phone"
+									name="secondaryPhone"
+									type="tel"
+								/>
 							</Field>
 
 							<Field>
@@ -167,12 +239,32 @@ export function CreateLeadSheet() {
 							</Field>
 
 							<Field>
-								<FieldLabel htmlFor="lead-phone">Phone</FieldLabel>
+								<FieldLabel htmlFor="lead-secondary-email">
+									Secondary email
+								</FieldLabel>
 								<Input
-									id="lead-phone"
-									name="phone"
-									placeholder="+91 …"
-									type="tel"
+									id="lead-secondary-email"
+									name="secondaryEmail"
+									type="email"
+								/>
+							</Field>
+
+							<Field>
+								<FieldLabel htmlFor="lead-website">Website</FieldLabel>
+								<Input
+									id="lead-website"
+									name="website"
+									placeholder="https://"
+									type="url"
+								/>
+							</Field>
+
+							<Field>
+								<FieldLabel htmlFor="lead-source">Lead source</FieldLabel>
+								<Input
+									id="lead-source"
+									name="source"
+									placeholder="Referral, website, event…"
 								/>
 							</Field>
 
@@ -182,12 +274,58 @@ export function CreateLeadSheet() {
 							</Field>
 
 							<Field>
-								<FieldLabel htmlFor="lead-source">Source</FieldLabel>
+								<FieldLabel htmlFor="lead-state">State</FieldLabel>
+								<Input id="lead-state" name="state" placeholder="Kerala" />
+							</Field>
+
+							<Field>
+								<FieldLabel htmlFor="lead-address">Address</FieldLabel>
+								<Textarea id="lead-address" name="address" rows={2} />
+							</Field>
+
+							<Field>
+								<FieldLabel htmlFor="lead-next-action">Next action</FieldLabel>
 								<Input
-									id="lead-source"
-									name="source"
-									placeholder="Referral, website, event…"
+									id="lead-next-action"
+									name="nextAction"
+									placeholder="e.g. Send proposal on Friday"
 								/>
+							</Field>
+
+							<Field>
+								<FieldLabel htmlFor="lead-owner">Lead owner</FieldLabel>
+								<Select onValueChange={setOwnerId} value={ownerId}>
+									<SelectTrigger id="lead-owner">
+										<SelectValue />
+									</SelectTrigger>
+									<SelectContent>
+										<SelectItem value={NONE}>Unassigned</SelectItem>
+										{(owners.data ?? []).map((owner) => (
+											<SelectItem key={owner.id} value={owner.id}>
+												{owner.name}
+											</SelectItem>
+										))}
+									</SelectContent>
+								</Select>
+							</Field>
+
+							<Field>
+								<FieldLabel htmlFor="lead-status">Lead status</FieldLabel>
+								<Select
+									onValueChange={(next) => setStage(next as LeadStage)}
+									value={stage}
+								>
+									<SelectTrigger id="lead-status">
+										<SelectValue />
+									</SelectTrigger>
+									<SelectContent>
+										{LEAD_BOARD.stages.map((option) => (
+											<SelectItem key={option} value={option}>
+												{LEAD_BOARD.label[option]}
+											</SelectItem>
+										))}
+									</SelectContent>
+								</Select>
 							</Field>
 
 							<Field>

@@ -1,4 +1,10 @@
-import { DealStage, EnrichmentStatus, RecordSource } from "@crm/db";
+import {
+	DealStage,
+	EnrichmentStatus,
+	EpcPortalStatus,
+	LeadKind,
+	RecordSource,
+} from "@crm/db";
 import { FIELD_TYPES } from "@crm/db/fields";
 import { z } from "zod";
 import { bulkIdsInput } from "../crm/bulk";
@@ -17,10 +23,36 @@ export const companyListInput = listInput.extend({
 
 export type CompanyListInput = z.infer<typeof companyListInput>;
 
+const accountType = z.enum(
+	Object.values(LeadKind) as [LeadKind, ...LeadKind[]],
+);
+
+const portalStatus = z.enum(
+	Object.values(EpcPortalStatus) as [EpcPortalStatus, ...EpcPortalStatus[]],
+);
+
+const accountFields = {
+	accountType: accountType.nullable().optional(),
+	state: z.string().max(120).optional(),
+	address: z.string().max(1000).optional(),
+	operatingRegions: z.string().max(500).optional(),
+	installationType: z.string().max(200).optional(),
+	portalStatus: portalStatus.optional(),
+	onboardedAt: z.string().nullable().optional(),
+	portalSubmissions: z.number().int().min(0).optional(),
+	customersReferred: z.number().int().min(0).optional(),
+	notes: z.string().max(5000).optional(),
+};
+
 export const companyCreateInput = z.object({
 	name: z.string().trim().min(1, "A company needs a name."),
 	domain: z.string().trim().optional(),
 	ownerId: z.string().nullable().optional(),
+	website: z.string().trim().optional(),
+	email: z.string().trim().optional(),
+	country: z.string().trim().optional(),
+	contactName: z.string().trim().max(200).optional(),
+	...accountFields,
 });
 
 export type CompanyCreateInput = z.infer<typeof companyCreateInput>;
@@ -39,6 +71,7 @@ const companyUpdateInput = z.object({
 	linkedinUrl: z.string().optional(),
 	ownerId: z.string().nullable().optional(),
 	fields: recordFieldValues.optional(),
+	...accountFields,
 });
 
 export type CompanyUpdateInput = z.infer<typeof companyUpdateInput>;
@@ -198,6 +231,17 @@ export const companyDetailOutput = z.object({
 	githubUrl: z.string().nullable(),
 	pricingUrl: z.string().nullable(),
 	careersUrl: z.string().nullable(),
+	state: z.string().nullable(),
+	address: z.string().nullable(),
+	accountType: accountType.nullable(),
+	operatingRegions: z.string().nullable(),
+	installationType: z.string().nullable(),
+	portalStatus,
+	onboardedAt: z.string().nullable(),
+	portalSubmissions: z.number(),
+	customersReferred: z.number(),
+	notes: z.string().nullable(),
+	convertedAt: z.string().nullable(),
 	enrichmentStatus: companyEnrichmentStatus,
 	enrichmentError: z.string().nullable(),
 	source: companyRecordSource,

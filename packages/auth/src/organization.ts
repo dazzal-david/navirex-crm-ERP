@@ -1,5 +1,11 @@
 import { type Db, db } from "@crm/db";
 import { WORKSPACE_ID, workspaceSlug } from "@crm/db/workspace";
+import {
+	INVITE_STATUS,
+	isInvitableRole,
+	NotInvitedError,
+	pendingInvitationFor,
+} from "./invitations";
 
 export { WORKSPACE_ID };
 
@@ -97,19 +103,39 @@ export async function ensureWorkspaceMembership(
 				});
 			}
 
-			await tx.member.upsert({
+			const member = await tx.member.findUnique({
 				where: {
 					organizationId_userId: { organizationId: workspace.id, userId },
 				},
-				create: {
-					id: crypto.randomUUID(),
-					organizationId: workspace.id,
-					userId,
-					role: "member",
-					createdAt: new Date(),
-				},
-				update: {},
+				select: { id: true },
 			});
+
+			if (!member) {
+				const user = await tx.user.findUnique({
+					where: { id: userId },
+					select: { email: true },
+				});
+				const invitation = await pendingInvitationFor(user?.email, tx);
+				if (!invitation) throw new NotInvitedError();
+
+				await tx.member.create({
+					data: {
+						id: crypto.randomUUID(),
+						organizationId: workspace.id,
+						userId,
+						role: isInvitableRole(invitation.role) ? invitation.role : "member",
+						createdAt: new Date(),
+					},
+				});
+				await tx.invitation.updateMany({
+					where: {
+						organizationId: workspace.id,
+						email: { equals: invitation.email, mode: "insensitive" },
+						status: INVITE_STATUS.pending,
+					},
+					data: { status: INVITE_STATUS.accepted },
+				});
+			}
 
 			const founder = await tx.member.findFirst({
 				where: { organizationId: workspace.id, role: "owner" },
@@ -133,6 +159,7 @@ export async function ensureWorkspaceMembership(
 			return workspace.id;
 		});
 	} catch (error) {
+		if (error instanceof NotInvitedError) throw error;
 		console.error(
 			`[auth] could not enrol user ${userId} in workspace ${WORKSPACE_ID}; the next sign-in will retry`,
 			error,

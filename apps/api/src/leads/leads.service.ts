@@ -1,5 +1,10 @@
 import { ActivityType, type Db, type LeadStage, type Prisma } from "@crm/db";
-import { Injectable, Logger, NotFoundException } from "@nestjs/common";
+import {
+	BadRequestException,
+	Injectable,
+	Logger,
+	NotFoundException,
+} from "@nestjs/common";
 import { AgentTriggerService } from "../agent/agent-trigger.service";
 import { InjectDatabase } from "../database/database.constants";
 import {
@@ -21,6 +26,7 @@ import { LEADS } from "./leads-config";
 const cardSelect = {
 	id: true,
 	name: true,
+	designation: true,
 	companyName: true,
 	email: true,
 	phone: true,
@@ -31,12 +37,28 @@ const cardSelect = {
 	source: true,
 	country: true,
 	rejectedReason: true,
+	nextAction: true,
+	companyId: true,
+	contactId: true,
+	convertedAt: true,
 	lastActivityAt: true,
 	createdAt: true,
 	owner: {
 		select: { id: true, name: true, image: true, designation: true },
 	},
 } satisfies Prisma.LeadSelect;
+
+const COMPANY_FILL_SELECT = {
+	id: true,
+	ownerId: true,
+	accountType: true,
+	email: true,
+	website: true,
+	country: true,
+	state: true,
+	address: true,
+	convertedAt: true,
+} satisfies Prisma.CompanySelect;
 
 @Injectable()
 export class LeadsService {
@@ -162,6 +184,11 @@ export class LeadsService {
 			where: { id },
 			select: {
 				...cardSelect,
+				secondaryPhone: true,
+				secondaryEmail: true,
+				website: true,
+				state: true,
+				address: true,
 				notes: true,
 				zohoId: true,
 				stageChangedAt: true,
@@ -188,15 +215,14 @@ export class LeadsService {
 	}
 
 	async create(input: LeadCreateInput, userId: string) {
-		const stage: LeadStage =
-			input.ownerId && input.stage === "UNASSIGNED" ? "ASSIGNED" : input.stage;
+		const stage: LeadStage = input.stage;
 		const position = await this.topOf(stage);
 		const source = blank(input.source) ?? "Manual entry";
 		const lead = await this.agent.withCrmEvents(async (tx, emit) => {
 			const created = await tx.lead.create({
 				data: {
+					...details(input),
 					name: input.name,
-					companyName: blank(input.companyName),
 					email: blank(input.email),
 					phone: blank(input.phone),
 					kind: input.kind,
@@ -204,8 +230,6 @@ export class LeadsService {
 					stage,
 					ownerId: input.ownerId ?? null,
 					source,
-					country: blank(input.country),
-					notes: blank(input.notes),
 					position,
 				},
 				select: cardSelect,
@@ -256,14 +280,13 @@ export class LeadsService {
 			return { id: existing.id, created: false };
 		}
 
-		const stage: LeadStage =
-			input.ownerId && input.stage === "UNASSIGNED" ? "ASSIGNED" : input.stage;
+		const stage: LeadStage = input.stage;
 		const position = await this.topOf(stage);
 		const lead = await this.agent.withCrmEvents(async (tx, emit) => {
 			const created = await tx.lead.create({
 				data: {
+					...details(input),
 					name: input.name,
-					companyName: blank(input.companyName),
 					email,
 					phone,
 					kind: input.kind,
@@ -272,8 +295,6 @@ export class LeadsService {
 					ownerId: input.ownerId ?? null,
 					source,
 					externalId,
-					country: blank(input.country),
-					notes: blank(input.notes),
 					position,
 				},
 				select: { id: true, createdAt: true },
@@ -315,16 +336,13 @@ export class LeadsService {
 						name: row.name,
 						zohoId: row.zohoId,
 					};
-					if (row.companyName !== undefined)
-						data.companyName = blank(row.companyName);
+					Object.assign(data, details(row, true));
 					if (row.email !== undefined) data.email = email;
 					if (row.phone !== undefined) data.phone = blank(row.phone);
 					if (row.kind !== undefined) data.kind = row.kind;
 					if (row.entity !== undefined) data.entity = row.entity;
 					if (row.ownerId !== undefined) data.ownerId = row.ownerId;
 					if (row.source !== undefined) data.source = blank(row.source);
-					if (row.country !== undefined) data.country = blank(row.country);
-					if (row.notes !== undefined) data.notes = blank(row.notes);
 					if (row.stage !== undefined && row.stage !== existing.stage) {
 						data.stage = row.stage;
 						data.stageChangedAt = new Date();
@@ -334,14 +352,14 @@ export class LeadsService {
 					await this.log(existing.id, userId, "Lead updated from Zoho CRM.");
 					updated += 1;
 				} else {
-					const stage = row.stage ?? "UNASSIGNED";
+					const stage = row.stage ?? "NOT_CONTACTED";
 					const position = await this.topOf(stage);
 					const source = blank(row.source) ?? "Zoho CRM";
 					const lead = await this.agent.withCrmEvents(async (tx, emit) => {
 						const imported = await tx.lead.create({
 							data: {
+								...details(row),
 								name: row.name,
-								companyName: blank(row.companyName),
 								email,
 								phone: blank(row.phone),
 								kind: row.kind ?? "EPC",
@@ -349,8 +367,6 @@ export class LeadsService {
 								stage,
 								ownerId: row.ownerId ?? null,
 								source,
-								country: blank(row.country),
-								notes: blank(row.notes),
 								zohoId: row.zohoId,
 								position,
 							},
@@ -390,16 +406,13 @@ export class LeadsService {
 
 		const data: Prisma.LeadUpdateInput = {};
 
+		Object.assign(data, details(rest, true));
 		if (rest.name !== undefined) data.name = rest.name;
-		if (rest.companyName !== undefined)
-			data.companyName = blank(rest.companyName);
 		if (rest.email !== undefined) data.email = blank(rest.email);
 		if (rest.phone !== undefined) data.phone = blank(rest.phone);
 		if (rest.kind !== undefined) data.kind = rest.kind;
 		if (rest.entity !== undefined) data.entity = rest.entity ?? null;
 		if (rest.source !== undefined) data.source = blank(rest.source);
-		if (rest.country !== undefined) data.country = blank(rest.country);
-		if (rest.notes !== undefined) data.notes = blank(rest.notes);
 		if (rest.ownerId !== undefined)
 			data.owner = rest.ownerId
 				? { connect: { id: rest.ownerId } }
@@ -425,35 +438,18 @@ export class LeadsService {
 	async assign(id: string, ownerId: string | null, userId: string) {
 		const current = await this.db.lead.findUnique({
 			where: { id },
-			select: { stage: true },
+			select: { id: true },
 		});
 
 		if (!current) throw new NotFoundException("That lead no longer exists.");
 
-		const stage: LeadStage =
-			ownerId === null
-				? "UNASSIGNED"
-				: current.stage === "UNASSIGNED"
-					? "ASSIGNED"
-					: current.stage;
-
-		const data: Prisma.LeadUncheckedUpdateInput = { ownerId, stage };
-		if (stage !== current.stage) {
-			data.stageChangedAt = new Date();
-			data.position = await this.topOf(stage);
-		}
-
 		const lead = await this.db.lead.update({
 			where: { id },
-			data,
+			data: { ownerId },
 			select: cardSelect,
 		});
 
-		await this.log(
-			id,
-			userId,
-			ownerId ? "Lead assigned." : "Lead returned to Unassigned.",
-		);
+		await this.log(id, userId, ownerId ? "Lead assigned." : "Lead unassigned.");
 
 		return lead;
 	}
@@ -479,10 +475,9 @@ export class LeadsService {
 			position,
 		};
 		if (movedStage) data.stageChangedAt = new Date();
-		if (movedStage && input.stage !== "UNASSIGNED" && !current.ownerId) {
+		if (movedStage && input.stage !== "NOT_CONTACTED" && !current.ownerId) {
 			data.ownerId = userId;
 		}
-		if (movedStage && input.stage === "UNASSIGNED") data.ownerId = null;
 
 		const lead = await this.db.lead.update({
 			where: { id: input.id },
@@ -499,6 +494,188 @@ export class LeadsService {
 		}
 
 		return lead;
+	}
+
+	async convert(id: string, userId: string) {
+		const lead = await this.db.lead.findUnique({
+			where: { id },
+			select: {
+				id: true,
+				name: true,
+				designation: true,
+				companyName: true,
+				email: true,
+				phone: true,
+				secondaryPhone: true,
+				website: true,
+				country: true,
+				state: true,
+				address: true,
+				kind: true,
+				ownerId: true,
+				companyId: true,
+				contactId: true,
+				convertedAt: true,
+			},
+		});
+
+		if (!lead) throw new NotFoundException("That lead no longer exists.");
+
+		if (lead.convertedAt && lead.companyId && lead.contactId) {
+			return {
+				leadId: lead.id,
+				companyId: lead.companyId,
+				contactId: lead.contactId,
+				convertedAt: lead.convertedAt,
+			};
+		}
+
+		const accountName = blank(lead.companyName ?? undefined);
+		if (!accountName && !lead.companyId) {
+			throw new BadRequestException(
+				"Add the company name before converting this lead.",
+			);
+		}
+
+		const now = new Date();
+		const email = blank(lead.email ?? undefined)?.toLowerCase() ?? null;
+
+		const result = await this.agent.withCrmEvents(async (tx, emit) => {
+			const existingCompany = lead.companyId
+				? await tx.company.findUnique({
+						where: { id: lead.companyId },
+						select: COMPANY_FILL_SELECT,
+					})
+				: await tx.company.findFirst({
+						where: {
+							archivedAt: null,
+							name: { equals: accountName ?? "", mode: "insensitive" },
+						},
+						orderBy: { createdAt: "asc" },
+						select: COMPANY_FILL_SELECT,
+					});
+
+			let companyId: string;
+			if (existingCompany) {
+				companyId = existingCompany.id;
+				const fill: Prisma.CompanyUncheckedUpdateInput = {};
+				if (!existingCompany.ownerId && lead.ownerId)
+					fill.ownerId = lead.ownerId;
+				if (!existingCompany.accountType) fill.accountType = lead.kind;
+				if (!existingCompany.email && email) fill.email = email;
+				if (!existingCompany.website && lead.website)
+					fill.website = lead.website;
+				if (!existingCompany.country && lead.country)
+					fill.country = lead.country;
+				if (!existingCompany.state && lead.state) fill.state = lead.state;
+				if (!existingCompany.address && lead.address)
+					fill.address = lead.address;
+				if (!existingCompany.convertedAt) fill.convertedAt = now;
+				await tx.company.update({ where: { id: companyId }, data: fill });
+			} else {
+				const created = await tx.company.create({
+					data: {
+						name: accountName ?? lead.name,
+						ownerId: lead.ownerId,
+						accountType: lead.kind,
+						email,
+						website: lead.website,
+						country: lead.country,
+						state: lead.state,
+						address: lead.address,
+						convertedAt: now,
+					},
+					select: { id: true, name: true, domain: true, createdAt: true },
+				});
+				companyId = created.id;
+				await emit({
+					type: "company.created",
+					record: { kind: "company", id: created.id },
+					occurredAt: created.createdAt,
+					data: { name: created.name, domain: created.domain },
+				});
+			}
+
+			const existingContact = lead.contactId
+				? await tx.contact.findUnique({
+						where: { id: lead.contactId },
+						select: { id: true, companyId: true },
+					})
+				: email
+					? await tx.contact.findFirst({
+							where: {
+								archivedAt: null,
+								email: { equals: email, mode: "insensitive" },
+							},
+							select: { id: true, companyId: true },
+						})
+					: null;
+
+			let contactId: string;
+			if (existingContact) {
+				contactId = existingContact.id;
+				if (!existingContact.companyId) {
+					await tx.contact.update({
+						where: { id: contactId },
+						data: { companyId },
+					});
+				}
+			} else {
+				const [firstName, ...rest] = lead.name.trim().split(/\s+/);
+				const created = await tx.contact.create({
+					data: {
+						firstName: firstName || lead.name,
+						lastName: rest.length > 0 ? rest.join(" ") : null,
+						email,
+						phone: lead.phone,
+						secondaryPhone: lead.secondaryPhone,
+						title: lead.designation,
+						companyId,
+						ownerId: lead.ownerId,
+					},
+					select: {
+						id: true,
+						firstName: true,
+						lastName: true,
+						email: true,
+						companyId: true,
+						createdAt: true,
+					},
+				});
+				contactId = created.id;
+				await emit({
+					type: "contact.created",
+					record: { kind: "contact", id: created.id },
+					occurredAt: created.createdAt,
+					data: {
+						firstName: created.firstName,
+						lastName: created.lastName,
+						email: created.email,
+						companyId: created.companyId,
+					},
+				});
+				await tx.company.updateMany({
+					where: { id: companyId, primaryContactId: null },
+					data: { primaryContactId: contactId },
+				});
+			}
+
+			await tx.lead.update({
+				where: { id: lead.id },
+				data: { companyId, contactId, convertedAt: now },
+			});
+
+			return { companyId, contactId };
+		});
+
+		await this.log(lead.id, userId, "Lead converted to an account.");
+
+		return {
+			leadId: lead.id,
+			companyId: result.companyId,
+			contactId: result.contactId,
+			convertedAt: now,
+		};
 	}
 
 	async remove(id: string) {
@@ -659,6 +836,33 @@ export class LeadsService {
 		if (!authorId) return;
 		await this.log(leadId, authorId, body);
 	}
+}
+
+const DETAIL_KEYS = [
+	"designation",
+	"companyName",
+	"secondaryPhone",
+	"website",
+	"country",
+	"state",
+	"address",
+	"nextAction",
+	"notes",
+] as const;
+
+type LeadDetails = Partial<
+	Record<(typeof DETAIL_KEYS)[number] | "secondaryEmail", string>
+>;
+
+function details(input: LeadDetails, onlyGiven = false) {
+	const data: Partial<Record<keyof LeadDetails, string | null>> = {};
+	for (const key of [...DETAIL_KEYS, "secondaryEmail"] as const) {
+		if (onlyGiven && input[key] === undefined) continue;
+		const value = blank(input[key]);
+		data[key] =
+			key === "secondaryEmail" ? (value?.toLowerCase() ?? null) : value;
+	}
+	return data;
 }
 
 function blank(value: string | undefined): string | null {

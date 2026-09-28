@@ -87,12 +87,13 @@ const STAGE_CARD_STYLE = [
 	"border-green-200/70 bg-green-50/60 dark:border-green-900/60 dark:bg-green-950/20",
 ] as const;
 const STAGE_TONE = {
-	UNASSIGNED: "warning",
-	ASSIGNED: "neutral",
-	TALKING: "info",
+	NOT_CONTACTED: "warning",
+	CONTACTED: "info",
 	INTERESTED: "primary",
-	REJECTED: "error",
-	APPROVED: "success",
+	FOLLOW_UP: "neutral",
+	ONBOARDED: "success",
+	NOT_INTERESTED: "error",
+	NOT_QUALIFIED: "neutral",
 } satisfies Record<(typeof LEAD_BOARD.stages)[number], StatusTone>;
 
 export function DashboardSummary() {

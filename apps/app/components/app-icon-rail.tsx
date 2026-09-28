@@ -239,7 +239,7 @@ export function AppIconRailFallback() {
 		<nav
 			aria-label="Primary"
 			aria-busy="true"
-			className="hidden w-(--width-app-navigation) shrink-0 flex-col gap-1 border-r bg-sidebar p-3 md:flex [view-transition-name:app-rail]"
+			className="dark hidden w-(--width-app-navigation) shrink-0 flex-col gap-1 border-r bg-sidebar p-3 text-sidebar-foreground md:flex [view-transition-name:app-rail]"
 		>
 			<RailBrand />
 			{ITEMS.map((item) => (
@@ -289,7 +289,7 @@ export function AppIconRail() {
 		<>
 			<nav
 				aria-label="Primary"
-				className="hidden w-(--width-app-navigation) shrink-0 flex-col gap-1 border-r bg-sidebar p-3 md:flex [view-transition-name:app-rail]"
+				className="dark hidden w-(--width-app-navigation) shrink-0 flex-col gap-1 border-r bg-sidebar p-3 text-sidebar-foreground md:flex [view-transition-name:app-rail]"
 			>
 				<RailBrand />
 				{primaryItems.map((item) => (
@@ -317,7 +317,7 @@ export function AppIconRail() {
 					<SheetContent
 						side="left"
 						showCloseButton={false}
-						className="w-5/6 max-w-sm flex-row gap-0 p-0"
+						className="dark w-5/6 max-w-sm flex-row gap-0 bg-sidebar p-0 text-sidebar-foreground"
 					>
 						<SheetHeader className="sr-only">
 							<SheetTitle>Navigation and agent chats</SheetTitle>
@@ -351,7 +351,10 @@ export function AppIconRail() {
 						/>
 					</SheetContent>
 				) : (
-					<SheetContent side="left" className="w-64 gap-0 p-0">
+					<SheetContent
+						side="left"
+						className="dark w-64 gap-0 bg-sidebar p-0 text-sidebar-foreground"
+					>
 						<SheetHeader>
 							<SheetTitle>Navigation</SheetTitle>
 						</SheetHeader>

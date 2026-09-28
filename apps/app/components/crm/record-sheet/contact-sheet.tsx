@@ -33,6 +33,7 @@ import { FieldsCog, RecordFields } from "@/components/crm/fields/record-fields";
 import {
 	InlineField,
 	InlineSelectField,
+	InlineTextArea,
 	savingValue,
 } from "@/components/crm/inline-field";
 import { OwnerCell } from "@/components/crm/owner-cell";
@@ -65,6 +66,10 @@ import { useOpenRecord, useRecordSheetView } from "./record-stack";
 
 type Contact = RouterOutputs["contacts"]["byId"];
 
+const CREATED_FORMAT: Intl.DateTimeFormatOptions = {
+	dateStyle: "medium",
+	timeStyle: "short",
+};
 const NONE = "none";
 
 const DATE_OPTIONS: Intl.DateTimeFormatOptions = {
@@ -338,9 +343,9 @@ function ContactOverview({ contact }: { contact: Contact }) {
 						onSave={(lastName) => save({ lastName })}
 					/>
 					<InlineField
-						label="Title"
+						label="Designation"
 						value={contact.title}
-						placeholder="Head of Security"
+						placeholder="e.g. Director"
 						saving={isSaving("title")}
 						onSave={(title) => save({ title })}
 						{...agentProps("title")}
@@ -353,11 +358,18 @@ function ContactOverview({ contact }: { contact: Contact }) {
 						onSave={(email) => save({ email })}
 					/>
 					<InlineField
-						label="Phone"
+						label="Phone number"
 						value={contact.phone}
 						type="tel"
 						saving={isSaving("phone")}
 						onSave={(phone) => save({ phone })}
+					/>
+					<InlineField
+						label="Secondary phone"
+						value={contact.secondaryPhone}
+						type="tel"
+						saving={isSaving("secondaryPhone")}
+						onSave={(secondaryPhone) => save({ secondaryPhone })}
 					/>
 					<InlineField
 						label="LinkedIn"
@@ -411,7 +423,20 @@ function ContactOverview({ contact }: { contact: Contact }) {
 						saving={isSavingField}
 						onSave={saveFields}
 					/>
+					<DetailSheetProperty label="Created">
+						<LocalDateTime date={contact.createdAt} options={CREATED_FORMAT} />
+					</DetailSheetProperty>
 				</DetailSheetProperties>
+			</DetailSheetSection>
+
+			<DetailSheetSection title="Notes">
+				<InlineTextArea
+					label="Notes"
+					value={contact.notes}
+					saving={isSaving("notes")}
+					placeholder="What matters about this person?"
+					onSave={(notes) => save({ notes })}
+				/>
 			</DetailSheetSection>
 
 			{contact.brief ? <Background brief={contact.brief} /> : null}
