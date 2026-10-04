@@ -6,12 +6,17 @@ import { TrpcModule } from "../trpc/trpc.module";
 import { CommunicationsController } from "./communications.controller";
 import { CommunicationsRouter } from "./communications.router";
 import { CommunicationsService } from "./communications.service";
+import { WhatsAppMediaController } from "./whatsapp-media.controller";
 import { WhatsAppWebhookController } from "./whatsapp-webhook.controller";
 import { WhatsAppWebhookService } from "./whatsapp-webhook.service";
 
 @Module({
 	imports: [TrpcModule, MailboxModule, LeadsModule, MicrosoftModule],
-	controllers: [CommunicationsController, WhatsAppWebhookController],
+	controllers: [
+		CommunicationsController,
+		WhatsAppMediaController,
+		WhatsAppWebhookController,
+	],
 	providers: [
 		CommunicationsService,
 		CommunicationsRouter,

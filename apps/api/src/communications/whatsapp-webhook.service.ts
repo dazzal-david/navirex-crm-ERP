@@ -8,7 +8,9 @@ import type { EnvironmentVariables } from "../config/env.validation";
 import { InjectDatabase } from "../database/database.constants";
 import { LeadsService } from "../leads/leads.service";
 import {
+	type WhatsAppMediaRef,
 	type WhatsAppWebhookPayload,
+	whatsappMediaOf,
 	whatsappMessageBody,
 	whatsappTimestamp,
 } from "./whatsapp-webhook.contracts";
@@ -121,6 +123,7 @@ export class WhatsAppWebhookService {
 						message.type,
 						whatsappMessageBody(message),
 						whatsappTimestamp(message.timestamp),
+						whatsappMediaOf(message),
 					);
 				}
 
@@ -143,6 +146,7 @@ export class WhatsAppWebhookService {
 		messageType: string,
 		body: string,
 		occurredAt: Date,
+		media: WhatsAppMediaRef | null,
 	): Promise<void> {
 		const phone = normalizePhone(from);
 		if (!phone) return;
@@ -205,6 +209,7 @@ export class WhatsAppWebhookService {
 						messageId,
 						messageType,
 						provider: "meta",
+						...media,
 					},
 				},
 				update: {},

@@ -12,11 +12,22 @@ import {
 } from "@crm/ui/components/dialog";
 import { Icon } from "@crm/ui/components/icon";
 import { Input } from "@crm/ui/components/input";
+import {
+	Select,
+	SelectContent,
+	SelectItem,
+	SelectTrigger,
+	SelectValue,
+} from "@crm/ui/components/select";
 import { Spinner } from "@crm/ui/components/spinner";
 import { Textarea } from "@crm/ui/components/textarea";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { toast } from "sonner";
+import { WhatsAppMediaComposer } from "@/components/crm/whatsapp/whatsapp-media-composer";
+import { WhatsAppWindowAlert } from "@/components/crm/whatsapp/whatsapp-window-alert";
+import { templateVariablePositions } from "@/lib/communications/template-variables";
+import { WHATSAPP_UI } from "@/lib/communications/whatsapp-config";
 import { useTRPC } from "@/lib/trpc/client";
 
 type Channel = "email" | "whatsapp";
@@ -73,14 +84,32 @@ function CommunicationDialog({
 	const queryClient = useQueryClient();
 	const [subject, setSubject] = useState("Following up from Navirex");
 	const [body, setBody] = useState("");
-	const [mode, setMode] = useState<"text" | "template">("text");
-	const [templateName, setTemplateName] = useState("");
-	const [language, setLanguage] = useState("en_US");
-	const [variables, setVariables] = useState("");
+	const [chosenMode, setMode] = useState<"text" | "template">("text");
+	const [templateId, setTemplateId] = useState<string | null>(null);
+	const [variables, setVariables] = useState<Record<number, string>>({});
 	const status = useQuery({
 		...trpc.communications.status.queryOptions(),
 		enabled: channel !== null,
 	});
+	const windowState = useQuery({
+		...trpc.communications.whatsappWindow.queryOptions({ leadId }),
+		enabled: channel === "whatsapp",
+		refetchInterval: WHATSAPP_UI.windowRefreshMs,
+	});
+	const templates = useQuery({
+		...trpc.templates.list.queryOptions(),
+		enabled: channel === "whatsapp",
+	});
+	const whatsappTemplates = (templates.data ?? []).filter(
+		(template) =>
+			template.active &&
+			template.channel === "WHATSAPP" &&
+			template.providerTemplateName,
+	);
+	const template = whatsappTemplates.find((item) => item.id === templateId);
+	const positions = template ? templateVariablePositions(template.body) : [];
+	const windowOpen = windowState.data?.open === true;
+	const mode = windowState.data && !windowOpen ? "template" : chosenMode;
 	const refresh = async () => {
 		await Promise.all([
 			queryClient.invalidateQueries({
@@ -106,6 +135,9 @@ function CommunicationDialog({
 			onSuccess: async () => {
 				await refresh();
 				toast.success("WhatsApp message accepted by Meta.");
+				setBody("");
+				setTemplateId(null);
+				setVariables({});
 				onClose();
 			},
 			onError: (error) => toast.error(error.message),
@@ -165,8 +197,12 @@ function CommunicationDialog({
 				) : null}
 				{channel === "whatsapp" ? (
 					<div className="flex flex-col gap-4">
+						{windowState.data ? (
+							<WhatsAppWindowAlert state={windowState.data} />
+						) : null}
 						<div className="flex gap-2">
 							<Button
+								disabled={!windowOpen}
 								onClick={() => setMode("text")}
 								size="sm"
 								variant={mode === "text" ? "default" : "outline"}
@@ -182,58 +218,103 @@ function CommunicationDialog({
 							</Button>
 						</div>
 						{mode === "text" ? (
-							<Field label="Message">
-								<Textarea
-									className="min-h-40"
-									onChange={(event) => setBody(event.target.value)}
-									value={body}
-								/>
-							</Field>
+							<>
+								<Field label="Message">
+									<Textarea
+										className="min-h-40"
+										onChange={(event) => setBody(event.target.value)}
+										value={body}
+									/>
+								</Field>
+								{whatsappReady ? (
+									<WhatsAppMediaComposer
+										caption={body}
+										disabled={pending}
+										leadId={leadId}
+										onSent={() => {
+											void refresh();
+											setBody("");
+										}}
+									/>
+								) : null}
+							</>
 						) : (
 							<>
-								<Field label="Template name">
-									<Input
-										onChange={(event) => setTemplateName(event.target.value)}
-										value={templateName}
-									/>
+								<Field label="Template">
+									<Select
+										onValueChange={(id) => {
+											setTemplateId(id);
+											setVariables({});
+										}}
+										value={templateId ?? undefined}
+									>
+										<SelectTrigger>
+											<SelectValue
+												placeholder={
+													whatsappTemplates.length > 0
+														? "Choose an approved template"
+														: "No approved templates. Sync them in Templates."
+												}
+											/>
+										</SelectTrigger>
+										<SelectContent>
+											{whatsappTemplates.map((item) => (
+												<SelectItem key={item.id} value={item.id}>
+													{item.name}
+												</SelectItem>
+											))}
+										</SelectContent>
+									</Select>
 								</Field>
-								<Field label="Language">
-									<Input
-										onChange={(event) => setLanguage(event.target.value)}
-										value={language}
-									/>
-								</Field>
-								<Field label="Body variables">
-									<Input
-										onChange={(event) => setVariables(event.target.value)}
-										placeholder="Comma-separated values"
-										value={variables}
-									/>
-								</Field>
+								{template ? (
+									<p className="whitespace-pre-wrap rounded-md border p-3 text-sm">
+										{template.body}
+									</p>
+								) : null}
+								{positions.map((position) => (
+									<Field key={position} label={`Value for {{${position}}}`}>
+										<Input
+											onChange={(event) =>
+												setVariables((current) => ({
+													...current,
+													[position]: event.target.value,
+												}))
+											}
+											value={variables[position] ?? ""}
+										/>
+									</Field>
+								))}
 							</>
 						)}
-						<p className="text-muted-foreground text-xs">
-							Conversation messages require an open customer service window. Use
-							approved templates otherwise.
-						</p>
 						<Button
 							disabled={
 								!whatsappReady ||
 								pending ||
-								(mode === "text" ? !body.trim() : !templateName.trim())
+								(mode === "text"
+									? !body.trim()
+									: !template ||
+										positions.some((position) => !variables[position]?.trim()))
 							}
 							onClick={() =>
-								whatsappMutation.mutate({
-									leadId,
-									mode,
-									body: mode === "text" ? body : undefined,
-									templateName: mode === "template" ? templateName : undefined,
-									language,
-									variables: variables
-										.split(",")
-										.map((value) => value.trim())
-										.filter(Boolean),
-								})
+								whatsappMutation.mutate(
+									mode === "text"
+										? {
+												leadId,
+												mode,
+												body,
+												language: "en_US",
+												variables: [],
+											}
+										: {
+												leadId,
+												mode,
+												templateName: template?.providerTemplateName ?? "",
+												language: template?.language ?? "en_US",
+												variables: positions.map(
+													(position) => variables[position] ?? "",
+												),
+											},
+								)
 							}
 						>
 							{pending

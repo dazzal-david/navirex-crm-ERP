@@ -35,6 +35,10 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { toast } from "sonner";
 import { useOpenRecord } from "@/components/crm/record-sheet/record-stack";
+import { WhatsAppAttachment } from "@/components/crm/whatsapp/whatsapp-attachment";
+import { WhatsAppMediaComposer } from "@/components/crm/whatsapp/whatsapp-media-composer";
+import { WhatsAppWindowAlert } from "@/components/crm/whatsapp/whatsapp-window-alert";
+import { templateVariablePositions } from "@/lib/communications/template-variables";
 import { useTRPC } from "@/lib/trpc/client";
 
 type Channel = "note" | "email" | "whatsapp";
@@ -119,7 +123,15 @@ export function CommunicationsInbox() {
 		(template) => template.id === selectedTemplateId,
 	);
 	const pending = note.isPending || email.isPending || whatsapp.isPending;
+	const whatsappWindow = conversation.data?.whatsappWindow ?? null;
+	const usingWhatsAppTemplate = Boolean(selectedTemplate?.providerTemplateName);
+	const templatesOnly =
+		channel === "whatsapp" &&
+		whatsappWindow !== null &&
+		!whatsappWindow.open &&
+		!usingWhatsAppTemplate;
 	const canSend =
+		!templatesOnly &&
 		Boolean(
 			activeId &&
 				(body.trim() ||
@@ -214,13 +226,25 @@ export function CommunicationsInbox() {
 																			: "outline"
 																}
 															>
-																<BubbleContent className="whitespace-pre-wrap">
-																	{item.body}
+																<BubbleContent className="flex flex-col gap-2 whitespace-pre-wrap">
+																	{item.attachment ? (
+																		<WhatsAppAttachment
+																			attachment={item.attachment}
+																		/>
+																	) : null}
+																	{item.attachment && /^\[.*\]$/.test(item.body)
+																		? null
+																		: item.body}
 																</BubbleContent>
 															</Bubble>
 															<MessageFooter>
 																{item.authorName ?? active.name} ·{" "}
 																{new Date(item.occurredAt).toLocaleString()}
+																{item.deliveryStatus === "failed"
+																	? ` · Not delivered${item.deliveryError ? `: ${item.deliveryError}` : ""}`
+																	: item.deliveryStatus === "read"
+																		? " · Read"
+																		: ""}
 															</MessageFooter>
 														</MessageContent>
 													</Message>
@@ -296,6 +320,11 @@ export function CommunicationsInbox() {
 									</SelectContent>
 								</Select>
 							</div>
+							{channel === "whatsapp" && whatsappWindow ? (
+								<div className="mb-2">
+									<WhatsAppWindowAlert state={whatsappWindow} />
+								</div>
+							) : null}
 							{channel === "email" ? (
 								<Input
 									className="mb-2"
@@ -309,12 +338,28 @@ export function CommunicationsInbox() {
 								value={body}
 								onChange={(event) => setBody(event.target.value)}
 								readOnly={Boolean(selectedTemplate?.providerTemplateName)}
+								disabled={templatesOnly}
 								placeholder={
-									channel === "note"
-										? "Add an internal note…"
-										: "Write a message…"
+									templatesOnly
+										? "Pick an approved template from “Use template” to message this lead."
+										: channel === "note"
+											? "Add an internal note…"
+											: "Write a message…"
 								}
 							/>
+							{channel === "whatsapp" &&
+							activeId &&
+							whatsappWindow?.open &&
+							status.data?.whatsapp ? (
+								<div className="mt-2">
+									<WhatsAppMediaComposer
+										caption={body}
+										disabled={pending}
+										leadId={activeId}
+										onSent={() => void refresh()}
+									/>
+								</div>
+							) : null}
 							{templateVariables.length > 0 ? (
 								<div className="mt-2 grid gap-2 sm:grid-cols-2">
 									{templateVariables.map((variable) => (
@@ -337,15 +382,17 @@ export function CommunicationsInbox() {
 							) : null}
 							<div className="mt-2 flex items-center justify-between gap-3">
 								<p className="text-muted-foreground text-xs">
-									{channel === "note"
-										? "Visible only to your team"
-										: channel === "email" && status.data?.email.sender
-											? `Send from ${status.data.email.sender}`
-											: channel === "email" && !canSend
-												? "Connect email sending if unavailable"
-												: channel === "whatsapp" && !canSend
-													? "Configure WhatsApp if unavailable"
-													: `Send via ${channelLabel(channel)}`}
+									{templatesOnly
+										? "Only templates can be sent to this lead right now"
+										: channel === "note"
+											? "Visible only to your team"
+											: channel === "email" && status.data?.email.sender
+												? `Send from ${status.data.email.sender}`
+												: channel === "email" && !canSend
+													? "Connect email sending if unavailable"
+													: channel === "whatsapp" && !canSend
+														? "Configure WhatsApp if unavailable"
+														: `Send via ${channelLabel(channel)}`}
 								</p>
 								<Button
 									disabled={!canSend || pending}
@@ -401,14 +448,4 @@ function channelLabel(channel: Channel): string {
 		: channel === "whatsapp"
 			? "WhatsApp"
 			: "Note";
-}
-
-function templateVariablePositions(body: string): number[] {
-	return [
-		...new Set(
-			Array.from(body.matchAll(/{{\s*(\d+)\s*}}/g), (match) =>
-				Number(match[1] ?? 0),
-			),
-		),
-	].sort((left, right) => left - right);
 }

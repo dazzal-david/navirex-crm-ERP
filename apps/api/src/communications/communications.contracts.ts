@@ -68,6 +68,23 @@ export const conversationItem = z.object({
 	body: z.string(),
 	authorName: z.string().nullable(),
 	occurredAt: z.date(),
+	attachment: z
+		.object({
+			url: z.string(),
+			kind: z.enum(["image", "video", "document", "audio", "sticker"]),
+			mimeType: z.string().nullable(),
+			filename: z.string().nullable(),
+			voice: z.boolean(),
+		})
+		.nullable(),
+	deliveryStatus: z.string().nullable(),
+	deliveryError: z.string().nullable(),
+});
+
+export const whatsappWindowOutput = z.object({
+	open: z.boolean(),
+	lastInboundAt: z.date().nullable(),
+	closesAt: z.date().nullable(),
 });
 
 export const conversationsOutput = z.array(conversationSummary);
@@ -75,6 +92,7 @@ export const conversationsOutput = z.array(conversationSummary);
 export const conversationOutput = z.object({
 	lead: conversationSummary.omit({ preview: true }),
 	items: z.array(conversationItem),
+	whatsappWindow: whatsappWindowOutput,
 });
 
 export const addNoteInput = z.object({

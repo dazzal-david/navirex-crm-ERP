@@ -8,6 +8,7 @@ import {
 import { ActivityType, type Db, type Prisma } from "@crm/db";
 import {
 	BadRequestException,
+	GoneException,
 	Injectable,
 	NotFoundException,
 } from "@nestjs/common";
@@ -17,12 +18,54 @@ import type { EnvironmentVariables } from "../config/env.validation";
 import { InjectDatabase } from "../database/database.constants";
 import { MailboxTokenService } from "../mailbox/mailbox-token.service";
 import { GraphMailService } from "../microsoft/graph-mail.service";
+import {
+	WHATSAPP,
+	type WhatsAppMediaKind,
+	WINDOW_CLOSED_MESSAGE,
+} from "./whatsapp-config";
 
 const communicationMetaValue = z.object({
 	channel: z.string().optional(),
 	direction: z.string().optional(),
 	fromName: z.string().nullable().optional(),
+	mediaId: z.string().optional(),
+	mediaKind: z
+		.enum(["image", "video", "document", "audio", "sticker"])
+		.optional(),
+	mimeType: z.string().nullable().optional(),
+	filename: z.string().nullable().optional(),
+	voice: z.boolean().optional(),
+	deliveryStatus: z.string().optional(),
+	deliveryError: z.string().nullable().optional(),
 });
+
+const graphSendResult = z.object({
+	messages: z.array(z.object({ id: z.string().optional() })).optional(),
+	id: z.string().optional(),
+	url: z.string().optional(),
+	mime_type: z.string().optional(),
+	error: z
+		.object({ message: z.string().optional(), code: z.number().optional() })
+		.optional(),
+});
+
+type WhatsAppMediaPayload = { id: string; caption?: string; filename?: string };
+
+type WhatsAppSendPayload = { messaging_product: "whatsapp"; to: string } & (
+	| { type: "text"; text: { body: string | undefined; preview_url: boolean } }
+	| { type: "template"; template: WhatsAppTemplate }
+	| ({ type: WhatsAppMediaKind } & Partial<
+			Record<WhatsAppMediaKind, WhatsAppMediaPayload>
+	  >)
+);
+
+type WhatsAppMediaUpload = {
+	leadId: string;
+	bytes: Buffer;
+	mimeType: string;
+	filename: string;
+	caption?: string;
+};
 
 type WhatsAppTemplate = {
 	name: string | undefined;
@@ -176,6 +219,18 @@ export class CommunicationsService {
 							? (meta.fromName ?? "WhatsApp contact")
 							: activity.createdBy.name,
 					occurredAt: activity.occurredAt ?? activity.createdAt,
+					attachment:
+						meta.mediaId && meta.mediaKind
+							? {
+									url: `/api/communications/media/${encodeURIComponent(activity.id)}`,
+									kind: meta.mediaKind,
+									mimeType: meta.mimeType ?? null,
+									filename: meta.filename ?? null,
+									voice: meta.voice ?? false,
+								}
+							: null,
+					deliveryStatus: meta.deliveryStatus ?? null,
+					deliveryError: meta.deliveryError ?? null,
 				};
 			}),
 			...emailMessages.map((message) => ({
@@ -189,13 +244,43 @@ export class CommunicationsService {
 				body: message.body ?? message.snippet ?? "Email message",
 				authorName: message.fromName ?? message.fromEmail,
 				occurredAt: message.sentAt,
+				attachment: null,
+				deliveryStatus: null,
+				deliveryError: null,
 			})),
 		].sort(
 			(left, right) => left.occurredAt.getTime() - right.occurredAt.getTime(),
 		);
 
 		const { contactId: _contactId, ...leadOutput } = lead;
-		return { lead: leadOutput, items };
+		return {
+			lead: leadOutput,
+			items,
+			whatsappWindow: await this.whatsappWindow(leadId),
+		};
+	}
+
+	async whatsappWindow(leadId: string) {
+		const last = await this.db.activity.findFirst({
+			where: {
+				leadId,
+				AND: [
+					{ meta: { path: ["channel"], equals: "whatsapp" } },
+					{ meta: { path: ["direction"], equals: "inbound" } },
+				],
+			},
+			orderBy: { occurredAt: { sort: "desc", nulls: "last" } },
+			select: { occurredAt: true, createdAt: true },
+		});
+		const lastInboundAt = last ? (last.occurredAt ?? last.createdAt) : null;
+		const closesAt = lastInboundAt
+			? new Date(lastInboundAt.getTime() + WHATSAPP.serviceWindowMs)
+			: null;
+		return {
+			open: closesAt !== null && closesAt.getTime() > Date.now(),
+			lastInboundAt,
+			closesAt,
+		};
 	}
 
 	async addNote(input: { leadId: string; body: string }, userId: string) {
@@ -370,19 +455,8 @@ export class CommunicationsService {
 		},
 		userId: string,
 	) {
-		if (!this.whatsappToken || !this.whatsappPhoneId) {
-			throw new BadRequestException("WhatsApp Cloud API is not configured.");
-		}
-		const lead = await this.db.lead.findUnique({
-			where: { id: input.leadId },
-			select: { id: true, phone: true },
-		});
-		if (!lead) throw new NotFoundException("That lead no longer exists.");
-		const phone = normalizePhone(lead.phone);
-		if (!phone)
-			throw new BadRequestException(
-				"Add a valid international phone number first.",
-			);
+		const lead = await this.whatsappLead(input.leadId);
+		if (input.mode === "text") await this.requireOpenWindow(lead.id);
 
 		const template: WhatsAppTemplate = {
 			name: input.templateName,
@@ -400,43 +474,21 @@ export class CommunicationsService {
 			];
 		}
 
-		const payload =
+		const messageId = await this.postWhatsApp(
 			input.mode === "text"
 				? {
 						messaging_product: "whatsapp",
-						to: phone,
+						to: lead.phone,
 						type: "text",
 						text: { body: input.body, preview_url: true },
 					}
 				: {
 						messaging_product: "whatsapp",
-						to: phone,
+						to: lead.phone,
 						type: "template",
 						template,
-					};
-
-		const response = await fetch(
-			`https://graph.facebook.com/v26.0/${encodeURIComponent(this.whatsappPhoneId)}/messages`,
-			{
-				method: "POST",
-				headers: {
-					authorization: `Bearer ${this.whatsappToken}`,
-					"content-type": "application/json",
-				},
-				body: JSON.stringify(payload),
-				signal: AbortSignal.timeout(20_000),
-			},
+					},
 		);
-		const result = (await response.json()) as {
-			messages?: { id?: string }[];
-			error?: { message?: string };
-		};
-		if (!response.ok) {
-			throw new BadRequestException(
-				result.error?.message ?? `WhatsApp returned HTTP ${response.status}.`,
-			);
-		}
-		const messageId = result.messages?.[0]?.id ?? null;
 		const body =
 			input.mode === "text"
 				? (input.body ?? "")
@@ -451,11 +503,187 @@ export class CommunicationsService {
 				channel: "whatsapp",
 				provider: "meta",
 				messageId,
-				to: phone,
+				to: lead.phone,
 				mode: input.mode,
 			},
 		);
 		return { provider: "whatsapp", messageId };
+	}
+
+	async sendWhatsAppMedia(input: WhatsAppMediaUpload, userId: string) {
+		const lead = await this.whatsappLead(input.leadId);
+		await this.requireOpenWindow(lead.id);
+
+		const mimeType = baseMimeType(input.mimeType);
+		const kind = mediaKindOf(mimeType);
+		if (!kind) {
+			throw new BadRequestException(
+				"WhatsApp cannot send this file type. Send an image (JPG, PNG), video (MP4), audio, PDF or Office document.",
+			);
+		}
+		if (input.bytes.byteLength === 0) {
+			throw new BadRequestException("The file is empty.");
+		}
+		if (input.bytes.byteLength > WHATSAPP.uploadMaxBytes) {
+			throw new BadRequestException(
+				`The file is too large. The limit is ${WHATSAPP.uploadMaxBytes / (1024 * 1024)} MB.`,
+			);
+		}
+
+		const form = new FormData();
+		form.append("messaging_product", "whatsapp");
+		form.append("type", mimeType);
+		form.append(
+			"file",
+			new Blob([new Uint8Array(input.bytes)], { type: mimeType }),
+			input.filename,
+		);
+		const upload = await this.graph(
+			`${WHATSAPP.graphBase}/${encodeURIComponent(this.whatsappPhoneId ?? "")}/media`,
+			{ method: "POST", body: form },
+		);
+		if (!upload.id) {
+			throw new BadRequestException("WhatsApp did not accept the file.");
+		}
+
+		const caption = input.caption?.trim() || undefined;
+		const media: WhatsAppMediaPayload = { id: upload.id };
+		if (caption && kind !== "audio") media.caption = caption;
+		if (kind === "document") media.filename = input.filename;
+
+		const messageId = await this.postWhatsApp({
+			messaging_product: "whatsapp",
+			to: lead.phone,
+			type: kind,
+			[kind]: media,
+		});
+
+		await this.log(
+			lead.id,
+			userId,
+			ActivityType.NOTE,
+			"WhatsApp message",
+			caption ?? mediaLabel(kind, input.filename),
+			{
+				channel: "whatsapp",
+				provider: "meta",
+				messageId,
+				to: lead.phone,
+				mode: "media",
+				mediaId: upload.id,
+				mediaKind: kind,
+				mimeType,
+				filename: input.filename,
+			},
+		);
+		return { provider: "whatsapp", messageId };
+	}
+
+	async whatsappMedia(activityId: string) {
+		if (!this.whatsappToken) {
+			throw new BadRequestException("WhatsApp Cloud API is not configured.");
+		}
+		const activity = await this.db.activity.findUnique({
+			where: { id: activityId },
+			select: { meta: true },
+		});
+		const meta = communicationMeta(activity?.meta ?? null);
+		if (!activity || meta.channel !== "whatsapp" || !meta.mediaId) {
+			throw new NotFoundException("That WhatsApp file does not exist.");
+		}
+
+		const expired = new GoneException(
+			"This file has expired. WhatsApp keeps files for 30 days.",
+		);
+		const lookup = await fetch(
+			`${WHATSAPP.graphBase}/${encodeURIComponent(meta.mediaId)}`,
+			{
+				headers: { authorization: `Bearer ${this.whatsappToken}` },
+				signal: AbortSignal.timeout(WHATSAPP.timeoutMs),
+			},
+		);
+		const found = graphSendResult.safeParse(
+			await lookup.json().catch(() => null),
+		);
+		if (!lookup.ok || !found.success || !found.data.url) throw expired;
+
+		const file = await fetch(found.data.url, {
+			headers: { authorization: `Bearer ${this.whatsappToken}` },
+			signal: AbortSignal.timeout(WHATSAPP.timeoutMs),
+		});
+		if (!file.ok || !file.body) throw expired;
+
+		return {
+			body: file.body,
+			mimeType:
+				found.data.mime_type ?? meta.mimeType ?? "application/octet-stream",
+			filename: meta.filename ?? `whatsapp-${meta.mediaKind ?? "file"}`,
+			size: file.headers.get("content-length"),
+		};
+	}
+
+	private async whatsappLead(leadId: string) {
+		if (!this.whatsappToken || !this.whatsappPhoneId) {
+			throw new BadRequestException("WhatsApp Cloud API is not configured.");
+		}
+		const lead = await this.db.lead.findUnique({
+			where: { id: leadId },
+			select: { id: true, phone: true },
+		});
+		if (!lead) throw new NotFoundException("That lead no longer exists.");
+		const phone = normalizePhone(lead.phone);
+		if (!phone)
+			throw new BadRequestException(
+				"Add a valid international phone number first.",
+			);
+		return { id: lead.id, phone };
+	}
+
+	private async requireOpenWindow(leadId: string) {
+		const window = await this.whatsappWindow(leadId);
+		if (!window.open) throw new BadRequestException(WINDOW_CLOSED_MESSAGE);
+	}
+
+	private async postWhatsApp(
+		payload: WhatsAppSendPayload,
+	): Promise<string | null> {
+		const result = await this.graph(
+			`${WHATSAPP.graphBase}/${encodeURIComponent(this.whatsappPhoneId ?? "")}/messages`,
+			{
+				method: "POST",
+				headers: { "content-type": "application/json" },
+				body: JSON.stringify(payload),
+			},
+		);
+		return result.messages?.[0]?.id ?? null;
+	}
+
+	private async graph(url: string, init: RequestInit) {
+		const response = await fetch(url, {
+			...init,
+			headers: {
+				...init.headers,
+				authorization: `Bearer ${this.whatsappToken}`,
+			},
+			signal: AbortSignal.timeout(WHATSAPP.timeoutMs),
+		});
+		const parsed = graphSendResult.safeParse(
+			await response.json().catch(() => null),
+		);
+		const result = parsed.success ? parsed.data : {};
+		if (!response.ok) {
+			const code = result.error?.code;
+			if (
+				code !== undefined &&
+				(WHATSAPP.windowClosedCodes as readonly number[]).includes(code)
+			) {
+				throw new BadRequestException(WINDOW_CLOSED_MESSAGE);
+			}
+			throw new BadRequestException(
+				result.error?.message ?? `WhatsApp returned HTTP ${response.status}.`,
+			);
+		}
+		return result;
 	}
 
 	private async sendGoogle(
@@ -547,7 +775,7 @@ export class CommunicationsService {
 		type: ActivityType,
 		subject: string,
 		body: string,
-		meta: Record<string, string | null>,
+		meta: Record<string, string | boolean | null>,
 	) {
 		const now = new Date();
 		await this.db.$transaction([
@@ -578,4 +806,23 @@ function communicationMeta(value: Prisma.JsonValue | null) {
 function normalizePhone(value: string | null): string | null {
 	const digits = value?.replace(/\D/g, "") ?? "";
 	return digits.length >= 8 && digits.length <= 15 ? digits : null;
+}
+
+function baseMimeType(value: string): string {
+	return value.split(";")[0]?.trim().toLowerCase() ?? "";
+}
+
+function mediaKindOf(mimeType: string): WhatsAppMediaKind | null {
+	for (const [kind, types] of Object.entries(WHATSAPP.mediaKinds)) {
+		if ((types as readonly string[]).includes(mimeType)) {
+			return kind as WhatsAppMediaKind;
+		}
+	}
+	return null;
+}
+
+function mediaLabel(kind: WhatsAppMediaKind, filename: string): string {
+	if (kind === "document") return `[Document: ${filename}]`;
+	if (kind === "audio") return "[Voice message]";
+	return kind === "image" ? "[Image]" : "[Video]";
 }

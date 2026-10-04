@@ -1,5 +1,13 @@
 import { z } from "zod";
 
+const whatsappMedia = z.object({
+	id: z.string().optional(),
+	mime_type: z.string().optional(),
+	caption: z.string().optional(),
+	filename: z.string().optional(),
+	voice: z.boolean().optional(),
+});
+
 const whatsappContact = z.object({
 	profile: z.object({ name: z.string().optional() }).optional(),
 	wa_id: z.string().optional(),
@@ -27,14 +35,11 @@ export const whatsappMessage = z
 					.optional(),
 			})
 			.optional(),
-		image: z.object({ caption: z.string().optional() }).optional(),
-		video: z.object({ caption: z.string().optional() }).optional(),
-		document: z
-			.object({
-				caption: z.string().optional(),
-				filename: z.string().optional(),
-			})
-			.optional(),
+		image: whatsappMedia.optional(),
+		video: whatsappMedia.optional(),
+		document: whatsappMedia.optional(),
+		audio: whatsappMedia.optional(),
+		sticker: whatsappMedia.optional(),
 		location: z
 			.object({
 				address: z.string().optional(),
@@ -130,12 +135,45 @@ export function whatsappMessageBody(message: WhatsAppMessage): string {
 			return `[Location: ${message.location.latitude}, ${message.location.longitude}]`;
 	}
 	if (message.reaction?.emoji) return `[Reaction: ${message.reaction.emoji}]`;
+	if (message.audio?.voice) return "[Voice message]";
 	const labels = new Map([
 		["audio", "Audio message"],
 		["contacts", "Contact card"],
 		["sticker", "Sticker"],
 	]);
 	return `[${labels.get(message.type) ?? `WhatsApp ${message.type} message`}]`;
+}
+
+export type WhatsAppMediaRef = {
+	mediaId: string;
+	mediaKind: "image" | "video" | "document" | "audio" | "sticker";
+	mimeType: string | null;
+	filename: string | null;
+	voice: boolean;
+};
+
+export function whatsappMediaOf(
+	message: WhatsAppMessage,
+): WhatsAppMediaRef | null {
+	for (const mediaKind of [
+		"image",
+		"video",
+		"document",
+		"audio",
+		"sticker",
+	] as const) {
+		const media = message[mediaKind];
+		if (media?.id) {
+			return {
+				mediaId: media.id,
+				mediaKind,
+				mimeType: media.mime_type ?? null,
+				filename: media.filename ?? null,
+				voice: media.voice ?? false,
+			};
+		}
+	}
+	return null;
 }
 
 export function whatsappTimestamp(value: string | undefined): Date {
