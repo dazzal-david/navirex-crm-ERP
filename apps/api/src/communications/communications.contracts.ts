@@ -9,10 +9,17 @@ export const communicationStatusOutput = z.object({
 	whatsapp: z.boolean(),
 });
 
+export const emailAttachmentInput = z.object({
+	name: z.string().trim().min(1).max(200),
+	mimeType: z.string().trim().max(200),
+	contentBase64: z.base64(),
+});
+
 export const sendEmailInput = z.object({
 	leadId: z.string(),
 	subject: z.string().trim().min(1).max(300),
 	body: z.string().trim().min(1).max(50_000),
+	attachments: z.array(emailAttachmentInput).max(10).default([]),
 });
 
 export const sendWhatsAppInput = z
@@ -79,6 +86,7 @@ export const conversationItem = z.object({
 		.nullable(),
 	deliveryStatus: z.string().nullable(),
 	deliveryError: z.string().nullable(),
+	fileNames: z.array(z.string()),
 });
 
 export const whatsappWindowOutput = z.object({

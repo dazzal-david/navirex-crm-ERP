@@ -57,7 +57,12 @@ export class GraphMailService {
 		return this.config?.sender ?? null;
 	}
 
-	async send(to: string, subject: string, body: string): Promise<void> {
+	async send(
+		to: string,
+		subject: string,
+		body: string,
+		attachments: MailAttachment[] = [],
+	): Promise<void> {
 		const config = this.requiredConfig();
 		const accessToken = await this.accessToken();
 		const response = await fetch(
@@ -69,11 +74,7 @@ export class GraphMailService {
 					"content-type": "application/json",
 				},
 				body: JSON.stringify({
-					message: {
-						subject,
-						body: { contentType: "Text", content: body },
-						toRecipients: [{ emailAddress: { address: to } }],
-					},
+					message: graphMessage(to, subject, body, attachments),
 					saveToSentItems: true,
 				}),
 				signal: AbortSignal.timeout(20_000),
@@ -167,4 +168,29 @@ export class GraphMailService {
 			return `${fallback} (HTTP ${response.status}).`;
 		}
 	}
+}
+
+export type MailAttachment = {
+	name: string;
+	mimeType: string;
+	content: Buffer;
+};
+
+export function graphMessage(
+	to: string,
+	subject: string,
+	body: string,
+	attachments: MailAttachment[],
+) {
+	return {
+		subject,
+		body: { contentType: "Text", content: body },
+		toRecipients: [{ emailAddress: { address: to } }],
+		attachments: attachments.map((attachment) => ({
+			"@odata.type": "#microsoft.graph.fileAttachment",
+			name: attachment.name,
+			contentType: attachment.mimeType,
+			contentBytes: attachment.content.toString("base64"),
+		})),
+	};
 }

@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import {
 	GMAIL_SEND_SCOPE,
 	GOOGLE_PROVIDER_ID,
@@ -17,7 +18,12 @@ import { z } from "zod";
 import type { EnvironmentVariables } from "../config/env.validation";
 import { InjectDatabase } from "../database/database.constants";
 import { MailboxTokenService } from "../mailbox/mailbox-token.service";
-import { GraphMailService } from "../microsoft/graph-mail.service";
+import {
+	GraphMailService,
+	graphMessage,
+	type MailAttachment,
+} from "../microsoft/graph-mail.service";
+import { EMAIL } from "./email-config";
 import {
 	WHATSAPP,
 	type WhatsAppMediaKind,
@@ -37,6 +43,7 @@ const communicationMetaValue = z.object({
 	voice: z.boolean().optional(),
 	deliveryStatus: z.string().optional(),
 	deliveryError: z.string().nullable().optional(),
+	attachmentNames: z.string().nullable().optional(),
 });
 
 const graphSendResult = z.object({
@@ -231,6 +238,9 @@ export class CommunicationsService {
 							: null,
 					deliveryStatus: meta.deliveryStatus ?? null,
 					deliveryError: meta.deliveryError ?? null,
+					fileNames: meta.attachmentNames
+						? meta.attachmentNames.split("\n")
+						: [],
 				};
 			}),
 			...emailMessages.map((message) => ({
@@ -247,6 +257,7 @@ export class CommunicationsService {
 				attachment: null,
 				deliveryStatus: null,
 				deliveryError: null,
+				fileNames: [],
 			})),
 		].sort(
 			(left, right) => left.occurredAt.getTime() - right.occurredAt.getTime(),
@@ -349,9 +360,15 @@ export class CommunicationsService {
 	}
 
 	async sendEmail(
-		input: { leadId: string; subject: string; body: string },
+		input: {
+			leadId: string;
+			subject: string;
+			body: string;
+			attachments?: { name: string; mimeType: string; contentBase64: string }[];
+		},
 		userId: string,
 	) {
+		const attachments = emailAttachments(input.attachments ?? []);
 		const lead = await this.db.lead.findUnique({
 			where: { id: input.leadId },
 			select: { id: true, email: true },
@@ -370,6 +387,7 @@ export class CommunicationsService {
 				lead.email,
 				input.subject,
 				input.body,
+				attachments,
 			);
 		} else if (status.email.google) {
 			provider = "google";
@@ -378,6 +396,7 @@ export class CommunicationsService {
 				lead.email,
 				input.subject,
 				input.body,
+				attachments,
 			);
 		} else if (status.email.microsoft) {
 			provider = "microsoft";
@@ -386,6 +405,7 @@ export class CommunicationsService {
 				lead.email,
 				input.subject,
 				input.body,
+				attachments,
 			);
 		} else {
 			throw new BadRequestException(
@@ -405,6 +425,10 @@ export class CommunicationsService {
 				messageId,
 				from: this.graphMail.sender,
 				to: lead.email,
+				attachmentNames:
+					attachments.length > 0
+						? attachments.map((attachment) => attachment.name).join("\n")
+						: null,
 			},
 		);
 		return { provider, messageId };
@@ -691,18 +715,11 @@ export class CommunicationsService {
 		to: string,
 		subject: string,
 		body: string,
+		attachments: MailAttachment[] = [],
 	) {
 		const token = await this.tokens.accessTokenFor(userId, "gmail");
 		if (token.outcome !== "ok") throw new BadRequestException(token.reason);
-		const mime = [
-			`To: ${to}`,
-			`Subject: =?UTF-8?B?${Buffer.from(subject).toString("base64")}?=`,
-			"MIME-Version: 1.0",
-			"Content-Type: text/plain; charset=UTF-8",
-			"Content-Transfer-Encoding: 8bit",
-			"",
-			body,
-		].join("\r\n");
+		const mime = gmailMime(to, subject, body, attachments);
 		const raw = Buffer.from(mime).toString("base64url");
 		const response = await fetch(
 			"https://gmail.googleapis.com/gmail/v1/users/me/messages/send",
@@ -732,9 +749,10 @@ export class CommunicationsService {
 		to: string,
 		subject: string,
 		body: string,
+		attachments: MailAttachment[] = [],
 	) {
 		if (this.graphMail.configured) {
-			await this.graphMail.send(to, subject, body);
+			await this.graphMail.send(to, subject, body, attachments);
 			return null;
 		}
 		const token = await this.tokens.accessTokenFor(userId, "outlook");
@@ -748,11 +766,7 @@ export class CommunicationsService {
 					"content-type": "application/json",
 				},
 				body: JSON.stringify({
-					message: {
-						subject,
-						body: { contentType: "Text", content: body },
-						toRecipients: [{ emailAddress: { address: to } }],
-					},
+					message: graphMessage(to, subject, body, attachments),
 					saveToSentItems: true,
 				}),
 				signal: AbortSignal.timeout(20_000),
@@ -825,4 +839,77 @@ function mediaLabel(kind: WhatsAppMediaKind, filename: string): string {
 	if (kind === "document") return `[Document: ${filename}]`;
 	if (kind === "audio") return "[Voice message]";
 	return kind === "image" ? "[Image]" : "[Video]";
+}
+
+function emailAttachments(
+	input: { name: string; mimeType: string; contentBase64: string }[],
+): MailAttachment[] {
+	if (input.length > EMAIL.attachmentMaxCount) {
+		throw new BadRequestException(
+			`Attach at most ${EMAIL.attachmentMaxCount} files.`,
+		);
+	}
+	const attachments = input.map((attachment) => ({
+		name: attachment.name.replace(/[\r\n"]/g, " "),
+		mimeType: baseMimeType(attachment.mimeType) || "application/octet-stream",
+		content: Buffer.from(attachment.contentBase64, "base64"),
+	}));
+	const total = attachments.reduce(
+		(sum, attachment) => sum + attachment.content.byteLength,
+		0,
+	);
+	if (total > EMAIL.attachmentMaxBytes) {
+		throw new BadRequestException(
+			`The attachments are too large. The limit is ${EMAIL.attachmentMaxBytes / (1024 * 1024)} MB in total.`,
+		);
+	}
+	return attachments;
+}
+
+function encodedWord(value: string): string {
+	return `=?UTF-8?B?${Buffer.from(value).toString("base64")}?=`;
+}
+
+function gmailMime(
+	to: string,
+	subject: string,
+	body: string,
+	attachments: MailAttachment[],
+): string {
+	const headers = [
+		`To: ${to}`,
+		`Subject: ${encodedWord(subject)}`,
+		"MIME-Version: 1.0",
+	];
+	if (attachments.length === 0) {
+		return [
+			...headers,
+			"Content-Type: text/plain; charset=UTF-8",
+			"Content-Transfer-Encoding: 8bit",
+			"",
+			body,
+		].join("\r\n");
+	}
+	const boundary = `navirex-${randomUUID()}`;
+	const parts = attachments.flatMap((attachment) => [
+		`--${boundary}`,
+		`Content-Type: ${attachment.mimeType}; name="${encodedWord(attachment.name)}"`,
+		`Content-Disposition: attachment; filename="${encodedWord(attachment.name)}"`,
+		"Content-Transfer-Encoding: base64",
+		"",
+		attachment.content.toString("base64").replace(/.{76}/g, "$&\r\n"),
+	]);
+	return [
+		...headers,
+		`Content-Type: multipart/mixed; boundary="${boundary}"`,
+		"",
+		`--${boundary}`,
+		"Content-Type: text/plain; charset=UTF-8",
+		"Content-Transfer-Encoding: 8bit",
+		"",
+		body,
+		...parts,
+		`--${boundary}--`,
+		"",
+	].join("\r\n");
 }

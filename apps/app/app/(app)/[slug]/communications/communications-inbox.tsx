@@ -34,6 +34,10 @@ import { Textarea } from "@crm/ui/components/textarea";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { toast } from "sonner";
+import {
+	type EmailAttachmentFile,
+	EmailAttachmentPicker,
+} from "@/components/crm/email/email-attachment-picker";
 import { useOpenRecord } from "@/components/crm/record-sheet/record-stack";
 import { WhatsAppAttachment } from "@/components/crm/whatsapp/whatsapp-attachment";
 import { WhatsAppMediaComposer } from "@/components/crm/whatsapp/whatsapp-media-composer";
@@ -63,6 +67,7 @@ export function CommunicationsInbox() {
 	const [channel, setChannel] = useState<Channel>("note");
 	const [subject, setSubject] = useState("Following up from Navirex");
 	const [body, setBody] = useState("");
+	const [emailFiles, setEmailFiles] = useState<EmailAttachmentFile[]>([]);
 	const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(
 		null,
 	);
@@ -98,6 +103,7 @@ export function CommunicationsInbox() {
 			}),
 		]);
 		setBody("");
+		setEmailFiles([]);
 		setSelectedTemplateId(null);
 		setTemplateVariables([]);
 	};
@@ -235,6 +241,11 @@ export function CommunicationsInbox() {
 																	{item.attachment && /^\[.*\]$/.test(item.body)
 																		? null
 																		: item.body}
+																	{item.fileNames.length > 0 ? (
+																		<span className="text-muted-foreground text-xs">
+																			Attached: {item.fileNames.join(", ")}
+																		</span>
+																	) : null}
 																</BubbleContent>
 															</Bubble>
 															<MessageFooter>
@@ -347,16 +358,26 @@ export function CommunicationsInbox() {
 											: "Write a message…"
 								}
 							/>
-							{channel === "whatsapp" &&
-							activeId &&
-							whatsappWindow?.open &&
-							status.data?.whatsapp ? (
+							{channel === "whatsapp" && activeId ? (
 								<div className="mt-2">
 									<WhatsAppMediaComposer
 										caption={body}
-										disabled={pending}
+										disabled={
+											pending ||
+											!status.data?.whatsapp ||
+											whatsappWindow?.open !== true
+										}
 										leadId={activeId}
 										onSent={() => void refresh()}
+									/>
+								</div>
+							) : null}
+							{channel === "email" ? (
+								<div className="mt-2">
+									<EmailAttachmentPicker
+										disabled={pending}
+										files={emailFiles}
+										onChange={setEmailFiles}
 									/>
 								</div>
 							) : null}
@@ -401,7 +422,14 @@ export function CommunicationsInbox() {
 										if (channel === "note")
 											note.mutate({ leadId: activeId, body });
 										if (channel === "email")
-											email.mutate({ leadId: activeId, subject, body });
+											email.mutate({
+												leadId: activeId,
+												subject,
+												body,
+												attachments: emailFiles.map(
+													({ size: _size, ...file }) => file,
+												),
+											});
 										if (channel === "whatsapp") {
 											const providerName =
 												selectedTemplate?.providerTemplateName;

@@ -24,6 +24,10 @@ import { Textarea } from "@crm/ui/components/textarea";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { toast } from "sonner";
+import {
+	type EmailAttachmentFile,
+	EmailAttachmentPicker,
+} from "@/components/crm/email/email-attachment-picker";
 import { WhatsAppMediaComposer } from "@/components/crm/whatsapp/whatsapp-media-composer";
 import { WhatsAppWindowAlert } from "@/components/crm/whatsapp/whatsapp-window-alert";
 import { templateVariablePositions } from "@/lib/communications/template-variables";
@@ -84,6 +88,7 @@ function CommunicationDialog({
 	const queryClient = useQueryClient();
 	const [subject, setSubject] = useState("Following up from Navirex");
 	const [body, setBody] = useState("");
+	const [emailFiles, setEmailFiles] = useState<EmailAttachmentFile[]>([]);
 	const [chosenMode, setMode] = useState<"text" | "template">("text");
 	const [templateId, setTemplateId] = useState<string | null>(null);
 	const [variables, setVariables] = useState<Record<number, string>>({});
@@ -125,6 +130,7 @@ function CommunicationDialog({
 			onSuccess: async () => {
 				await refresh();
 				toast.success("Email sent.");
+				setEmailFiles([]);
 				onClose();
 			},
 			onError: (error) => toast.error(error.message),
@@ -181,11 +187,25 @@ function CommunicationDialog({
 								value={body}
 							/>
 						</Field>
+						<EmailAttachmentPicker
+							disabled={pending}
+							files={emailFiles}
+							onChange={setEmailFiles}
+						/>
 						<Button
 							disabled={
 								!emailReady || !subject.trim() || !body.trim() || pending
 							}
-							onClick={() => emailMutation.mutate({ leadId, subject, body })}
+							onClick={() =>
+								emailMutation.mutate({
+									leadId,
+									subject,
+									body,
+									attachments: emailFiles.map(
+										({ size: _size, ...file }) => file,
+									),
+								})
+							}
 						>
 							{pending
 								? "Sending…"
@@ -200,6 +220,15 @@ function CommunicationDialog({
 						{windowState.data ? (
 							<WhatsAppWindowAlert state={windowState.data} />
 						) : null}
+						<WhatsAppMediaComposer
+							caption={mode === "text" ? body : ""}
+							disabled={pending || !whatsappReady || !windowOpen}
+							leadId={leadId}
+							onSent={() => {
+								void refresh();
+								setBody("");
+							}}
+						/>
 						<div className="flex gap-2">
 							<Button
 								disabled={!windowOpen}
@@ -226,17 +255,6 @@ function CommunicationDialog({
 										value={body}
 									/>
 								</Field>
-								{whatsappReady ? (
-									<WhatsAppMediaComposer
-										caption={body}
-										disabled={pending}
-										leadId={leadId}
-										onSent={() => {
-											void refresh();
-											setBody("");
-										}}
-									/>
-								) : null}
 							</>
 						) : (
 							<>
