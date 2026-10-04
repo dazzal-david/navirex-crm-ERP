@@ -10,6 +10,7 @@ import { Spinner } from "@crm/ui/components/spinner";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { z } from "zod";
+import { toMp3 } from "@/lib/communications/mp3";
 import { WHATSAPP_UI } from "@/lib/communications/whatsapp-config";
 
 type Draft = { file: Blob; filename: string; previewUrl: string };
@@ -101,11 +102,11 @@ export function WhatsAppMediaComposer({
 		const format = !("MediaRecorder" in globalThis)
 			? undefined
 			: WHATSAPP_UI.recordingTypes.find((type) =>
-					MediaRecorder.isTypeSupported(type.mimeType),
+					MediaRecorder.isTypeSupported(type),
 				);
 		if (!format) {
 			toast.error(
-				"This browser cannot record voice notes in a format WhatsApp accepts. Use the latest Chrome, Safari or Firefox.",
+				"This browser cannot record audio. Use the latest Chrome, Safari or Firefox.",
 			);
 			return;
 		}
@@ -117,23 +118,30 @@ export function WhatsAppMediaComposer({
 			return;
 		}
 		const chunks: Blob[] = [];
-		const media = new MediaRecorder(stream, { mimeType: format.mimeType });
+		const media = new MediaRecorder(stream, { mimeType: format });
 		media.ondataavailable = (event) => {
 			if (event.data.size > 0) chunks.push(event.data);
 		};
-		media.onstop = () => {
+		media.onstop = async () => {
 			stream.getTracks().forEach((track) => {
 				track.stop();
 			});
-			const type = format.mimeType.split(";")[0] ?? format.mimeType;
-			const file = new Blob(chunks, { type });
+			let file: Blob;
+			try {
+				file = await toMp3(new Blob(chunks, { type: format }));
+			} catch {
+				toast.error(
+					"The voice note could not be converted. Try recording again.",
+				);
+				return;
+			}
 			if (file.size > WHATSAPP_UI.uploadMaxBytes) {
 				toast.error("The voice note is too long. The limit is 4 MB.");
 				return;
 			}
 			setDraft({
 				file,
-				filename: `voice-note.${format.extension}`,
+				filename: WHATSAPP_UI.voiceNote.filename,
 				previewUrl: URL.createObjectURL(file),
 			});
 		};

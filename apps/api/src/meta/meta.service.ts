@@ -1,4 +1,3 @@
-import { createHmac, timingSafeEqual } from "node:crypto";
 import { auth, isMetaConfigured, META_PROVIDER_ID } from "@crm/auth";
 import type { Db } from "@crm/db";
 import {
@@ -13,6 +12,7 @@ import { InjectDatabase } from "../database/database.constants";
 import { LeadsService } from "../leads/leads.service";
 import type { MetaPage, MetaWebhookPayload } from "./meta.contracts";
 import { META } from "./meta-config";
+import { metaSignatureMatches } from "./meta-signature";
 
 type GraphPage = { id: string; name: string; access_token?: string };
 type GraphField = { name: string; values?: string[] };
@@ -195,13 +195,7 @@ export class MetaService {
 		if (!this.appSecret || !signature?.startsWith("sha256=")) {
 			throw new BadRequestException("Meta webhook signature is missing.");
 		}
-		const expected = createHmac("sha256", this.appSecret)
-			.update(raw)
-			.digest("hex");
-		const received = signature.slice("sha256=".length);
-		const left = Buffer.from(expected, "hex");
-		const right = Buffer.from(received, "hex");
-		if (left.length !== right.length || !timingSafeEqual(left, right)) {
+		if (!metaSignatureMatches(this.appSecret, raw, signature)) {
 			throw new BadRequestException("Meta webhook signature is invalid.");
 		}
 	}

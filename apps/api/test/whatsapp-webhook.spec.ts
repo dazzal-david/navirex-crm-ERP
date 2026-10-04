@@ -55,6 +55,41 @@ describe("WhatsApp webhook verification", () => {
 	});
 });
 
+describe("WhatsApp webhook signatures on a re-serialized body", () => {
+	const signed = (raw: string) =>
+		`sha256=${createHmac("sha256", APP_SECRET).update(raw).digest("hex")}`;
+
+	it("accepts a media message Meta signed with escaped slashes", () => {
+		const fromMeta =
+			'{"object":"whatsapp_business_account","entry":[{"changes":[{"value":{"messages":[{"type":"image","image":{"mime_type":"image\\/jpeg","id":"1"}}]}}]}]}';
+		const reserialized = JSON.stringify(JSON.parse(fromMeta));
+
+		expect(reserialized).not.toBe(fromMeta);
+		expect(() =>
+			service().verifySignature(reserialized, signed(fromMeta)),
+		).not.toThrow();
+	});
+
+	it("accepts a name Meta signed with escaped unicode", () => {
+		const fromMeta =
+			'{"object":"whatsapp_business_account","entry":[{"changes":[{"value":{"contacts":[{"profile":{"name":"Jos\\u00e9 \\ud83d\\ude00"}}]}}]}]}';
+		const reserialized = JSON.stringify(JSON.parse(fromMeta));
+
+		expect(() =>
+			service().verifySignature(reserialized, signed(fromMeta)),
+		).not.toThrow();
+	});
+
+	it("still rejects a body signed with another secret", () => {
+		const raw = '{"object":"whatsapp_business_account","entry":[]}';
+		const forged = `sha256=${createHmac("sha256", "wrong").update(raw).digest("hex")}`;
+
+		expect(() => service().verifySignature(raw, forged)).toThrow(
+			"WhatsApp webhook signature is invalid.",
+		);
+	});
+});
+
 describe("WhatsApp webhook payloads", () => {
 	it("reads inbound text and contact identity", () => {
 		const payload = whatsappWebhookPayload.parse({

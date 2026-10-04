@@ -10,6 +10,7 @@ import {
 	Req,
 } from "@nestjs/common";
 import { AllowAnonymous } from "@thallesp/nestjs-better-auth";
+import { readWebhookBody } from "../communications/whatsapp-webhook.controller";
 import { type MetaWebhookPayload, metaWebhookPayload } from "./meta.contracts";
 import { MetaService } from "./meta.service";
 
@@ -33,7 +34,7 @@ export class MetaWebhookController {
 		@Req() request: IncomingMessage,
 		@Headers("x-hub-signature-256") signature?: string,
 	) {
-		const raw = await read(request, 1_000_000);
+		const raw = await readWebhookBody(request, 1_000_000);
 		if (!raw) throw new BadRequestException("Webhook body is empty.");
 		this.meta.verifySignature(raw, signature);
 		let payload: MetaWebhookPayload;
@@ -45,16 +46,4 @@ export class MetaWebhookController {
 		await this.meta.webhook(payload);
 		return { received: true };
 	}
-}
-
-async function read(
-	request: IncomingMessage,
-	limit: number,
-): Promise<string | null> {
-	let body = "";
-	for await (const chunk of request) {
-		body += Buffer.isBuffer(chunk) ? chunk.toString("utf8") : String(chunk);
-		if (Buffer.byteLength(body) > limit) return null;
-	}
-	return body || null;
 }

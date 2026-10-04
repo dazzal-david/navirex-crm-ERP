@@ -22,9 +22,11 @@ export const WHATSAPP_UI = {
 		"text/plain",
 	].join(","),
 	recordingTypes: [
-		{ mimeType: "audio/ogg;codecs=opus", extension: "ogg" },
-		{ mimeType: "audio/mp4;codecs=mp4a.40.2", extension: "m4a" },
-		{ mimeType: "audio/mp4", extension: "m4a" },
+		"audio/webm;codecs=opus",
+		"audio/ogg;codecs=opus",
+		"audio/mp4",
+		"audio/webm",
 	],
+	voiceNote: { kbps: 64, frameSamples: 1152, filename: "voice-note.mp3" },
 	windowRefreshMs: 60_000,
 } as const;

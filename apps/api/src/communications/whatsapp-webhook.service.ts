@@ -1,4 +1,3 @@
-import { createHmac, timingSafeEqual } from "node:crypto";
 import { ActivityType, type Db, type Prisma } from "@crm/db";
 import { SETTINGS_ID } from "@crm/db/settings";
 import { BadRequestException, Injectable, Logger } from "@nestjs/common";
@@ -7,6 +6,7 @@ import { z } from "zod";
 import type { EnvironmentVariables } from "../config/env.validation";
 import { InjectDatabase } from "../database/database.constants";
 import { LeadsService } from "../leads/leads.service";
+import { metaSignatureMatches } from "../meta/meta-signature";
 import {
 	type WhatsAppMediaRef,
 	type WhatsAppWebhookPayload,
@@ -69,13 +69,7 @@ export class WhatsAppWebhookService {
 			);
 			throw new BadRequestException("WhatsApp webhook signature is missing.");
 		}
-		const expected = createHmac("sha256", this.appSecret)
-			.update(raw)
-			.digest("hex");
-		const received = signature.slice("sha256=".length);
-		const left = Buffer.from(expected, "hex");
-		const right = Buffer.from(received, "hex");
-		if (left.length !== right.length || !timingSafeEqual(left, right)) {
+		if (!metaSignatureMatches(this.appSecret, raw, signature)) {
 			this.logger.warn(
 				"Rejected WhatsApp webhook because its signature does not match the configured Meta app secret.",
 			);

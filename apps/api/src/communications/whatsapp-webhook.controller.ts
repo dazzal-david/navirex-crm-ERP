@@ -63,12 +63,15 @@ export async function readWebhookBody(
 	request: IncomingMessage & { body?: unknown },
 	limit: number,
 ): Promise<string | null> {
-	let body = "";
+	const chunks: Buffer[] = [];
+	let size = 0;
 	for await (const chunk of request) {
-		body += Buffer.isBuffer(chunk) ? chunk.toString("utf8") : String(chunk);
-		if (Buffer.byteLength(body) > limit) return null;
+		const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(String(chunk));
+		size += buffer.byteLength;
+		if (size > limit) return null;
+		chunks.push(buffer);
 	}
-	if (body) return body;
+	if (size > 0) return Buffer.concat(chunks).toString("utf8");
 
 	let parsed: unknown;
 	try {
