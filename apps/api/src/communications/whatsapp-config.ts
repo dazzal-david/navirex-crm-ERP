@@ -8,6 +8,12 @@ export const WHATSAPP = {
 	timeoutMs: 20_000,
 	serviceWindowMs: 24 * HOUR_MS,
 	uploadMaxBytes: 4 * MB,
+	templateHeaderMaxBytes: 16 * MB,
+	templateHeaderTypes: {
+		image: "image/jpeg",
+		video: "video/mp4",
+		document: "application/pdf",
+	},
 	windowClosedCodes: [131047],
 	mediaKinds: {
 		image: ["image/jpeg", "image/png"],

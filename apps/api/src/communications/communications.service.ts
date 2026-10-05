@@ -548,11 +548,14 @@ export class CommunicationsService {
 		return { provider: "whatsapp", messageId };
 	}
 
-	async uploadWhatsAppMedia(input: {
-		bytes: Buffer;
-		mimeType: string;
-		filename: string;
-	}) {
+	async uploadWhatsAppMedia(
+		input: {
+			bytes: Buffer;
+			mimeType: string;
+			filename: string;
+		},
+		maxBytes: number = WHATSAPP.uploadMaxBytes,
+	) {
 		if (!this.whatsappToken || !this.whatsappPhoneId) {
 			throw new BadRequestException("WhatsApp Cloud API is not configured.");
 		}
@@ -566,9 +569,9 @@ export class CommunicationsService {
 		if (input.bytes.byteLength === 0) {
 			throw new BadRequestException("The file is empty.");
 		}
-		if (input.bytes.byteLength > WHATSAPP.uploadMaxBytes) {
+		if (input.bytes.byteLength > maxBytes) {
 			throw new BadRequestException(
-				`The file is too large. The limit is ${WHATSAPP.uploadMaxBytes / (1024 * 1024)} MB.`,
+				`The file is too large. The limit is ${maxBytes / (1024 * 1024)} MB.`,
 			);
 		}
 
@@ -694,7 +697,7 @@ export class CommunicationsService {
 		const headerMedia: WhatsAppHeaderMediaSource | null = headerMediaId
 			? { id: headerMediaId }
 			: media?.sampleUrl
-				? { link: media.sampleUrl }
+				? { id: await this.uploadTemplateSample(media.sampleUrl, media.kind) }
 				: null;
 
 		try {
@@ -704,6 +707,38 @@ export class CommunicationsService {
 				error instanceof Error ? error.message : String(error),
 			);
 		}
+	}
+
+	private async uploadTemplateSample(
+		sampleUrl: string,
+		kind: keyof typeof WHATSAPP.templateHeaderTypes,
+	): Promise<string> {
+		const failure = new BadRequestException(
+			`Could not load this template's approved header ${kind} from Meta. Use "Replace ${kind}" to attach one.`,
+		);
+		let response: Response;
+		try {
+			response = await fetch(sampleUrl, {
+				signal: AbortSignal.timeout(WHATSAPP.timeoutMs),
+			});
+		} catch {
+			throw failure;
+		}
+		if (!response.ok) throw failure;
+		const bytes = Buffer.from(await response.arrayBuffer());
+		const declared = baseMimeType(response.headers.get("content-type") ?? "");
+		const mimeType = mediaKindOf(declared)
+			? declared
+			: WHATSAPP.templateHeaderTypes[kind];
+		const upload = await this.uploadWhatsAppMedia(
+			{
+				bytes,
+				mimeType,
+				filename: `template-header.${mimeType.split("/")[1] ?? "bin"}`,
+			},
+			WHATSAPP.templateHeaderMaxBytes,
+		);
+		return upload.id;
 	}
 
 	private async freshComponents(
