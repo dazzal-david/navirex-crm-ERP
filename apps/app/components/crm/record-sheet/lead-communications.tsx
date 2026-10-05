@@ -29,8 +29,14 @@ import {
 	EmailAttachmentPicker,
 } from "@/components/crm/email/email-attachment-picker";
 import { WhatsAppMediaComposer } from "@/components/crm/whatsapp/whatsapp-media-composer";
+import {
+	templateDefaults,
+	templateReady,
+	WhatsAppTemplateFields,
+	type WhatsAppTemplateFieldsValue,
+} from "@/components/crm/whatsapp/whatsapp-template-fields";
+import { WhatsAppTemplatePreview } from "@/components/crm/whatsapp/whatsapp-template-preview";
 import { WhatsAppWindowAlert } from "@/components/crm/whatsapp/whatsapp-window-alert";
-import { templateVariablePositions } from "@/lib/communications/template-variables";
 import { WHATSAPP_UI } from "@/lib/communications/whatsapp-config";
 import { useTRPC } from "@/lib/trpc/client";
 
@@ -91,7 +97,8 @@ function CommunicationDialog({
 	const [emailFiles, setEmailFiles] = useState<EmailAttachmentFile[]>([]);
 	const [chosenMode, setMode] = useState<"text" | "template">("text");
 	const [templateId, setTemplateId] = useState<string | null>(null);
-	const [variables, setVariables] = useState<Record<number, string>>({});
+	const [templateValue, setTemplateValue] =
+		useState<WhatsAppTemplateFieldsValue>(templateDefaults(null));
 	const status = useQuery({
 		...trpc.communications.status.queryOptions(),
 		enabled: channel !== null,
@@ -112,7 +119,7 @@ function CommunicationDialog({
 			template.providerTemplateName,
 	);
 	const template = whatsappTemplates.find((item) => item.id === templateId);
-	const positions = template ? templateVariablePositions(template.body) : [];
+
 	const windowOpen = windowState.data?.open === true;
 	const mode = windowState.data && !windowOpen ? "template" : chosenMode;
 	const refresh = async () => {
@@ -143,7 +150,7 @@ function CommunicationDialog({
 				toast.success("WhatsApp message accepted by Meta.");
 				setBody("");
 				setTemplateId(null);
-				setVariables({});
+				setTemplateValue(templateDefaults(null));
 				onClose();
 			},
 			onError: (error) => toast.error(error.message),
@@ -262,7 +269,12 @@ function CommunicationDialog({
 									<Select
 										onValueChange={(id) => {
 											setTemplateId(id);
-											setVariables({});
+											setTemplateValue(
+												templateDefaults(
+													whatsappTemplates.find((item) => item.id === id)
+														?.components ?? null,
+												),
+											);
 										}}
 										value={templateId ?? undefined}
 									>
@@ -285,23 +297,15 @@ function CommunicationDialog({
 									</Select>
 								</Field>
 								{template ? (
-									<p className="whitespace-pre-wrap rounded-md border p-3 text-sm">
-										{template.body}
-									</p>
+									<WhatsAppTemplatePreview template={template} />
 								) : null}
-								{positions.map((position) => (
-									<Field key={position} label={`Value for {{${position}}}`}>
-										<Input
-											onChange={(event) =>
-												setVariables((current) => ({
-													...current,
-													[position]: event.target.value,
-												}))
-											}
-											value={variables[position] ?? ""}
-										/>
-									</Field>
-								))}
+								{template ? (
+									<WhatsAppTemplateFields
+										components={template.components}
+										onChange={setTemplateValue}
+										value={templateValue}
+									/>
+								) : null}
 							</>
 						)}
 						<Button
@@ -311,7 +315,7 @@ function CommunicationDialog({
 								(mode === "text"
 									? !body.trim()
 									: !template ||
-										positions.some((position) => !variables[position]?.trim()))
+										!templateReady(template.components, templateValue))
 							}
 							onClick={() =>
 								whatsappMutation.mutate(
@@ -328,9 +332,9 @@ function CommunicationDialog({
 												mode,
 												templateName: template?.providerTemplateName ?? "",
 												language: template?.language ?? "en_US",
-												variables: positions.map(
-													(position) => variables[position] ?? "",
-												),
+												variables: [],
+												fields: templateValue.fields,
+												headerMediaId: templateValue.headerMediaId ?? undefined,
 											},
 								)
 							}

@@ -8,6 +8,14 @@ import {
 } from "@crm/auth";
 import { ActivityType, type Db, type Prisma } from "@crm/db";
 import {
+	buildTemplateComponents,
+	templateHeaderMedia,
+	type WhatsAppHeaderMediaSource,
+	type WhatsAppSendComponent,
+	type WhatsAppTemplateComponent,
+	whatsappTemplateComponents,
+} from "@crm/validation/whatsapp-template";
+import {
 	BadRequestException,
 	GoneException,
 	Injectable,
@@ -56,6 +64,10 @@ const graphSendResult = z.object({
 		.optional(),
 });
 
+const freshTemplate = z.object({
+	components: whatsappTemplateComponents.optional(),
+});
+
 type WhatsAppMediaPayload = { id: string; caption?: string; filename?: string };
 
 type WhatsAppSendPayload = { messaging_product: "whatsapp"; to: string } & (
@@ -77,10 +89,7 @@ type WhatsAppMediaUpload = {
 type WhatsAppTemplate = {
 	name: string | undefined;
 	language: { code: string };
-	components?: {
-		type: "body";
-		parameters: { type: "text"; text: string }[];
-	}[];
+	components?: WhatsAppSendComponent[];
 };
 
 @Injectable()
@@ -476,6 +485,8 @@ export class CommunicationsService {
 			templateName?: string;
 			language: string;
 			variables: string[];
+			fields?: Record<string, string>;
+			headerMediaId?: string;
 		},
 		userId: string,
 	) {
@@ -486,16 +497,19 @@ export class CommunicationsService {
 			name: input.templateName,
 			language: { code: input.language },
 		};
-		if (input.variables.length > 0) {
-			template.components = [
+		if (input.mode === "template" && input.templateName) {
+			const components = await this.templateComponents(
+				input.templateName,
+				input.language,
 				{
-					type: "body",
-					parameters: input.variables.map((text) => ({
-						type: "text",
-						text,
-					})),
+					...Object.fromEntries(
+						input.variables.map((value, index) => [`body:${index + 1}`, value]),
+					),
+					...input.fields,
 				},
-			];
+				input.headerMediaId,
+			);
+			if (components.length > 0) template.components = components;
 		}
 
 		const messageId = await this.postWhatsApp(
@@ -534,10 +548,14 @@ export class CommunicationsService {
 		return { provider: "whatsapp", messageId };
 	}
 
-	async sendWhatsAppMedia(input: WhatsAppMediaUpload, userId: string) {
-		const lead = await this.whatsappLead(input.leadId);
-		await this.requireOpenWindow(lead.id);
-
+	async uploadWhatsAppMedia(input: {
+		bytes: Buffer;
+		mimeType: string;
+		filename: string;
+	}) {
+		if (!this.whatsappToken || !this.whatsappPhoneId) {
+			throw new BadRequestException("WhatsApp Cloud API is not configured.");
+		}
 		const mimeType = baseMimeType(input.mimeType);
 		const kind = mediaKindOf(mimeType);
 		if (!kind) {
@@ -569,6 +587,14 @@ export class CommunicationsService {
 		if (!upload.id) {
 			throw new BadRequestException("WhatsApp did not accept the file.");
 		}
+		return { id: upload.id, kind, mimeType };
+	}
+
+	async sendWhatsAppMedia(input: WhatsAppMediaUpload, userId: string) {
+		const lead = await this.whatsappLead(input.leadId);
+		await this.requireOpenWindow(lead.id);
+		const upload = await this.uploadWhatsAppMedia(input);
+		const { kind, mimeType } = upload;
 
 		const caption = input.caption?.trim() || undefined;
 		const media: WhatsAppMediaPayload = { id: upload.id };
@@ -644,6 +670,62 @@ export class CommunicationsService {
 			filename: meta.filename ?? `whatsapp-${meta.mediaKind ?? "file"}`,
 			size: file.headers.get("content-length"),
 		};
+	}
+
+	private async templateComponents(
+		name: string,
+		language: string,
+		values: Record<string, string>,
+		headerMediaId: string | undefined,
+	): Promise<WhatsAppSendComponent[]> {
+		const stored = await this.db.messageTemplate.findFirst({
+			where: { channel: "WHATSAPP", providerTemplateName: name, language },
+			orderBy: { updatedAt: "desc" },
+			select: { providerTemplateId: true, components: true },
+		});
+		const storedComponents = whatsappTemplateComponents.safeParse(
+			stored?.components ?? null,
+		);
+		const components =
+			(await this.freshComponents(stored?.providerTemplateId ?? null)) ??
+			(storedComponents.success ? storedComponents.data : []);
+
+		const media = templateHeaderMedia(components);
+		const headerMedia: WhatsAppHeaderMediaSource | null = headerMediaId
+			? { id: headerMediaId }
+			: media?.sampleUrl
+				? { link: media.sampleUrl }
+				: null;
+
+		try {
+			return buildTemplateComponents(components, values, headerMedia);
+		} catch (error) {
+			throw new BadRequestException(
+				error instanceof Error ? error.message : String(error),
+			);
+		}
+	}
+
+	private async freshComponents(
+		templateId: string | null,
+	): Promise<WhatsAppTemplateComponent[] | null> {
+		if (!templateId || !this.whatsappToken) return null;
+		try {
+			const response = await fetch(
+				`${WHATSAPP.graphBase}/${encodeURIComponent(templateId)}?fields=components`,
+				{
+					headers: { authorization: `Bearer ${this.whatsappToken}` },
+					signal: AbortSignal.timeout(WHATSAPP.timeoutMs),
+				},
+			);
+			const parsed = freshTemplate.safeParse(
+				await response.json().catch(() => null),
+			);
+			if (!response.ok || !parsed.success) return null;
+			return parsed.data.components ?? null;
+		} catch {
+			return null;
+		}
 	}
 
 	private async whatsappLead(leadId: string) {

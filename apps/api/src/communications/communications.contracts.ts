@@ -30,6 +30,8 @@ export const sendWhatsAppInput = z
 		templateName: z.string().trim().max(512).optional(),
 		language: z.string().trim().max(20).default("en_US"),
 		variables: z.array(z.string().max(1024)).max(10).default([]),
+		fields: z.record(z.string(), z.string().max(2000)).default({}),
+		headerMediaId: z.string().trim().max(200).optional(),
 	})
 	.superRefine((input, context) => {
 		if (input.mode === "text" && !input.body) {

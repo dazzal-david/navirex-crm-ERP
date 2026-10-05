@@ -1,3 +1,4 @@
+import { whatsappTemplateComponents } from "@crm/validation/whatsapp-template";
 import { z } from "zod";
 
 export const templateChannel = z.enum(["EMAIL", "WHATSAPP", "NOTE"]);
@@ -8,6 +9,11 @@ export const templateOutput = z.object({
 	channel: templateChannel,
 	subject: z.string().nullable(),
 	body: z.string(),
+	headerFormat: z.string().nullable(),
+	headerText: z.string().nullable(),
+	headerMediaUrl: z.string().nullable(),
+	footer: z.string().nullable(),
+	components: whatsappTemplateComponents.nullable(),
 	providerTemplateName: z.string().nullable(),
 	providerTemplateId: z.string().nullable(),
 	providerStatus: z.string().nullable(),

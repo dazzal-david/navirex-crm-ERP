@@ -165,6 +165,76 @@ describe("the lead board", () => {
 		expect(contact.companyId).toBe(company.id);
 	});
 
+	it("links a customer to a serving EPC, or keeps a typed EPC name", async () => {
+		const epc = await db.company.create({
+			data: {
+				name: `Serving EPC ${suffix}`,
+				accountType: "EPC",
+				ownerId: userId,
+			},
+		});
+		const linked = await service.create(
+			{
+				name: `Customer linked ${suffix}`,
+				kind: "CUSTOMER",
+				stage: "NOT_CONTACTED",
+				ownerId: userId,
+				servingEpcId: epc.id,
+			},
+			userId,
+		);
+		const typed = await service.create(
+			{
+				name: `Customer typed ${suffix}`,
+				kind: "CUSTOMER",
+				stage: "NOT_CONTACTED",
+				ownerId: userId,
+				servingEpcName: "Sunrise Installers",
+			},
+			userId,
+		);
+
+		expect(linked.servingEpc).toEqual({ id: epc.id, name: epc.name });
+		expect(typed.servingEpc).toBeNull();
+		expect(typed.servingEpcName).toBe("Sunrise Installers");
+		const untyped = await db.company.create({
+			data: { name: `Untyped installer ${suffix}`, ownerId: userId },
+		});
+		const customerAccount = await db.company.create({
+			data: {
+				name: `Customer account ${suffix}`,
+				accountType: "CUSTOMER",
+				ownerId: userId,
+			},
+		});
+		const options = (await service.epcOptions()).map((option) => option.id);
+
+		expect(options).toContain(epc.id);
+		expect(options).toContain(untyped.id);
+		expect(options).not.toContain(customerAccount.id);
+		expect(options.indexOf(epc.id)).toBeLessThan(options.indexOf(untyped.id));
+	});
+
+	it("converts a customer with no company into an account named after them", async () => {
+		const lead = await service.create(
+			{
+				name: `Ravi Customer ${suffix}`,
+				kind: "CUSTOMER",
+				stage: "ONBOARDED",
+				ownerId: userId,
+			},
+			userId,
+		);
+
+		const result = await service.convert(lead.id, userId);
+		const company = await db.company.findUniqueOrThrow({
+			where: { id: result.companyId },
+		});
+
+		expect(company.name).toBe(`Ravi Customer ${suffix}`);
+		expect(company.accountType).toBe("CUSTOMER");
+	});
+
 	it("refuses to convert a lead with no company name", async () => {
 		const lead = await createLead(`No company ${suffix}`);
 

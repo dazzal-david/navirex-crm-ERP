@@ -21,6 +21,7 @@ import {
 	leadCreateInput,
 	leadDeleteOutput,
 	leadDetailOutput,
+	leadEpcOptionsOutput,
 	leadIdInput,
 	leadIntakeInput,
 	leadIntakeOutput,
@@ -91,6 +92,14 @@ export class LeadsRouter {
 	})
 	async owners() {
 		return this.leads.owners();
+	}
+
+	@Query({
+		output: leadEpcOptionsOutput,
+		meta: restMeta("GET", "/leads/epc-options", ["Leads"]),
+	})
+	async epcOptions() {
+		return this.leads.epcOptions();
 	}
 
 	@Mutation({

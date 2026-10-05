@@ -47,6 +47,26 @@ export class WhatsAppMediaController {
 		);
 	}
 
+	@Post("whatsapp/upload")
+	async upload(
+		@Query("filename") filename: string | undefined,
+		@Headers("content-type") contentType: string | undefined,
+		@Req() request: IncomingMessage,
+	) {
+		const bytes = await readBytes(request, WHATSAPP.uploadMaxBytes);
+		if (!bytes) {
+			throw new BadRequestException(
+				`The file is too large. The limit is ${WHATSAPP.uploadMaxBytes / (1024 * 1024)} MB.`,
+			);
+		}
+		const upload = await this.communications.uploadWhatsAppMedia({
+			bytes,
+			mimeType: contentType ?? "",
+			filename: filename?.trim() || "file",
+		});
+		return { id: upload.id, kind: upload.kind };
+	}
+
 	@Post("whatsapp/:leadId/media")
 	async send(
 		@Param("leadId") leadId: string,

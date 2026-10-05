@@ -36,6 +36,8 @@ export const leadCard = z.object({
 	companyId: z.string().nullable(),
 	contactId: z.string().nullable(),
 	convertedAt: z.date().nullable(),
+	servingEpc: z.object({ id: z.string(), name: z.string() }).nullable(),
+	servingEpcName: z.string().nullable(),
 	owner: z
 		.object({
 			id: z.string(),
@@ -107,6 +109,8 @@ export const leadCreateInput = z.object({
 	address: z.string().trim().max(1000).optional(),
 	nextAction: z.string().trim().max(1000).optional(),
 	notes: z.string().trim().max(5000).optional(),
+	servingEpcId: z.string().nullable().optional(),
+	servingEpcName: z.string().trim().max(200).optional(),
 });
 
 export const leadIntakeInput = leadCreateInput
@@ -183,6 +187,10 @@ export const leadConvertOutput = z.object({
 });
 
 export const leadDeleteOutput = z.object({ id: z.string() });
+
+export const leadEpcOptionsOutput = z.array(
+	z.object({ id: z.string(), name: z.string() }),
+);
 
 export const leadOwnersOutput = z.array(
 	z.object({

@@ -70,6 +70,7 @@ afterEach(() => {
 
 afterAll(async () => {
 	await db.activity.deleteMany({ where: { createdById: userId } });
+	await db.messageTemplate.deleteMany({ where: { createdById: userId } });
 	await db.lead.deleteMany({ where: { name: { endsWith: suffix } } });
 	await db.user.delete({ where: { id: userId } });
 });
@@ -142,6 +143,89 @@ describe("the WhatsApp 24-hour window", () => {
 				userId,
 			),
 		).rejects.toThrow(WINDOW_CLOSED_MESSAGE);
+	});
+});
+
+describe("WhatsApp templates with a header and buttons", () => {
+	it("fills every blank from Meta's examples unless the rep typed a value", async () => {
+		const name = `promo_${suffix.slice(0, 8)}`;
+		await db.messageTemplate.create({
+			data: {
+				name: `Meta · ${name}`,
+				channel: "WHATSAPP",
+				body: "Hello {{1}}, your code is {{2}}",
+				providerTemplateName: name,
+				providerTemplateId: `tpl-${suffix}`,
+				language: "en_US",
+				createdById: userId,
+			},
+		});
+		const calls = stubMeta((call) =>
+			call.url.includes(`tpl-${suffix}`)
+				? Response.json({
+						components: [
+							{
+								type: "HEADER",
+								format: "IMAGE",
+								example: { header_handle: ["https://example.test/fresh.jpg"] },
+							},
+							{
+								type: "BODY",
+								text: "Hello {{1}}, your code is {{2}}",
+								example: { body_text: [["Asha", "SUN50"]] },
+							},
+							{
+								type: "BUTTONS",
+								buttons: [
+									{ type: "QUICK_REPLY", text: "Call me" },
+									{
+										type: "URL",
+										text: "Open offer",
+										url: "https://navirex.in/offer/{{1}}",
+										example: ["https://navirex.in/offer/abc123"],
+									},
+								],
+							},
+						],
+					})
+				: Response.json({ messages: [{ id: "wamid.promo" }] }),
+		);
+		const leadId = await leadWithInbound(null);
+
+		await communications.sendWhatsApp(
+			{
+				leadId,
+				mode: "template",
+				templateName: name,
+				language: "en_US",
+				variables: [],
+				fields: { "body:1": "Ravi" },
+			},
+			userId,
+		);
+
+		const sent = JSON.parse(String(calls.at(-1)?.init?.body));
+		expect(sent.template.components).toEqual([
+			{
+				type: "header",
+				parameters: [
+					{ type: "image", image: { link: "https://example.test/fresh.jpg" } },
+				],
+			},
+			{
+				type: "body",
+				parameters: [
+					{ type: "text", text: "Ravi" },
+					{ type: "text", text: "SUN50" },
+				],
+			},
+			{
+				type: "button",
+				sub_type: "url",
+				index: "1",
+				parameters: [{ type: "text", text: "abc123" }],
+			},
+		]);
 	});
 });
 

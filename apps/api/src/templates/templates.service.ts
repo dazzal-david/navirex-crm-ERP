@@ -2,6 +2,7 @@ import { canManageTemplates, workspaceRoleOf } from "@crm/auth";
 import type { Db, Prisma } from "@crm/db";
 import { SETTINGS_ID } from "@crm/db/settings";
 import { WORKSPACE_ID } from "@crm/db/workspace";
+import { whatsappTemplateComponents } from "@crm/validation/whatsapp-template";
 import {
 	BadGatewayException,
 	ForbiddenException,
@@ -11,9 +12,15 @@ import {
 	ServiceUnavailableException,
 } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
+import { z } from "zod";
 import type { EnvironmentVariables } from "../config/env.validation";
 import { InjectDatabase } from "../database/database.constants";
 import { META } from "../meta/meta-config";
+import {
+	type MetaTemplate,
+	metaTemplate,
+	templateParts,
+} from "./meta-template";
 import type {
 	MetaTemplateSyncOutput,
 	TemplateCreateInput,
@@ -24,20 +31,11 @@ import type {
 const REFRESH_INTERVAL_MS = 15 * 60_000;
 const REFRESH_INTERVAL_MINUTES = REFRESH_INTERVAL_MS / 60_000;
 
-type MetaTemplate = {
-	id: string;
-	name: string;
-	language: string;
-	status: string;
-	category?: string;
-	components?: Array<{ type: string; text?: string }>;
-};
-
-type MetaTemplatePage = {
-	data?: MetaTemplate[];
-	paging?: { next?: string };
-	error?: { message?: string };
-};
+const metaTemplatePage = z.object({
+	data: z.array(metaTemplate).optional(),
+	paging: z.object({ next: z.string().optional() }).optional(),
+	error: z.object({ message: z.string().optional() }).optional(),
+});
 
 @Injectable()
 export class TemplatesService {
@@ -70,8 +68,15 @@ export class TemplatesService {
 			}
 		}
 
-		return this.db.messageTemplate.findMany({
+		const rows = await this.db.messageTemplate.findMany({
 			orderBy: [{ active: "desc" }, { updatedAt: "desc" }],
+		});
+		return rows.map((row) => {
+			const components = whatsappTemplateComponents.safeParse(row.components);
+			return {
+				...row,
+				components: components.success ? components.data : null,
+			};
 		});
 	}
 
@@ -222,7 +227,7 @@ export class TemplatesService {
 					select: { id: true },
 				});
 				const data = {
-					body: templateBody(template),
+					...templateParts(template),
 					providerTemplateName: template.name,
 					providerTemplateId: template.id,
 					providerStatus: template.status,
@@ -318,8 +323,11 @@ export class TemplatesService {
 				headers: { authorization: `Bearer ${accessToken}` },
 				signal: AbortSignal.timeout(20_000),
 			});
-			const page = (await response.json()) as MetaTemplatePage;
-			if (!response.ok) {
+			const parsed = metaTemplatePage.safeParse(
+				await response.json().catch(() => null),
+			);
+			const page = parsed.success ? parsed.data : {};
+			if (!response.ok || !parsed.success) {
 				throw new BadGatewayException(
 					page.error?.message ?? "Meta template request failed.",
 				);
@@ -355,13 +363,6 @@ export class TemplatesService {
 	private clearSyncPromise(sync: Promise<MetaTemplateSyncOutput>) {
 		if (this.syncPromise === sync) this.syncPromise = null;
 	}
-}
-
-function templateBody(template: MetaTemplate): string {
-	return (
-		template.components?.find((component) => component.type === "BODY")?.text ??
-		`Meta template: ${template.name}`
-	);
 }
 
 function blank(value: string | undefined): string | null {

@@ -41,6 +41,8 @@ const cardSelect = {
 	companyId: true,
 	contactId: true,
 	convertedAt: true,
+	servingEpc: { select: { id: true, name: true } },
+	servingEpcName: true,
 	lastActivityAt: true,
 	createdAt: true,
 	owner: {
@@ -201,6 +203,21 @@ export class LeadsService {
 		return lead;
 	}
 
+	async epcOptions() {
+		const companies = await this.db.company.findMany({
+			where: {
+				archivedAt: null,
+				OR: [{ accountType: "EPC" }, { accountType: null }],
+			},
+			select: { id: true, name: true, accountType: true },
+			orderBy: { name: "asc" },
+		});
+		return [
+			...companies.filter((company) => company.accountType === "EPC"),
+			...companies.filter((company) => company.accountType !== "EPC"),
+		].map(({ id, name }) => ({ id, name }));
+	}
+
 	async owners() {
 		return this.db.user.findMany({
 			select: {
@@ -229,6 +246,7 @@ export class LeadsService {
 					entity: input.entity ?? null,
 					stage,
 					ownerId: input.ownerId ?? null,
+					servingEpcId: input.servingEpcId ?? null,
 					source,
 					position,
 				},
@@ -293,6 +311,7 @@ export class LeadsService {
 					entity: input.entity ?? null,
 					stage,
 					ownerId: input.ownerId ?? null,
+					servingEpcId: input.servingEpcId ?? null,
 					source,
 					externalId,
 					position,
@@ -413,6 +432,10 @@ export class LeadsService {
 		if (rest.kind !== undefined) data.kind = rest.kind;
 		if (rest.entity !== undefined) data.entity = rest.entity ?? null;
 		if (rest.source !== undefined) data.source = blank(rest.source);
+		if (rest.servingEpcId !== undefined)
+			data.servingEpc = rest.servingEpcId
+				? { connect: { id: rest.servingEpcId } }
+				: { disconnect: true };
 		if (rest.ownerId !== undefined)
 			data.owner = rest.ownerId
 				? { connect: { id: rest.ownerId } }
@@ -531,7 +554,7 @@ export class LeadsService {
 		}
 
 		const accountName = blank(lead.companyName ?? undefined);
-		if (!accountName && !lead.companyId) {
+		if (!accountName && !lead.companyId && lead.kind !== "CUSTOMER") {
 			throw new BadRequestException(
 				"Add the company name before converting this lead.",
 			);
@@ -848,6 +871,7 @@ const DETAIL_KEYS = [
 	"address",
 	"nextAction",
 	"notes",
+	"servingEpcName",
 ] as const;
 
 type LeadDetails = Partial<

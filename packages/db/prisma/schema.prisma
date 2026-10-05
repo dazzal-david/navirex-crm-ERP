@@ -345,7 +345,8 @@ model Company {
   contacts       Contact[]           @relation("CompanyContacts")
   conversations  AgentConversation[]
   deals          Deal[]
-  leads          Lead[]
+  leads          Lead[]              @relation("LeadCompany")
+  servedLeads    Lead[]              @relation("ServingEpc")
   activities     Activity[]
   emailThreads   EmailThread[]
   calendarEvents CalendarEvent[]
@@ -1041,11 +1042,15 @@ model Lead {
   zohoId String?
 
   companyId String?
-  company   Company? @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  company   Company? @relation("LeadCompany", fields: [companyId], references: [id], onDelete: SetNull)
   contactId String?
   contact   Contact? @relation(fields: [contactId], references: [id], onDelete: SetNull)
 
   convertedAt DateTime?
+
+  servingEpcId   String?
+  servingEpc     Company? @relation("ServingEpc", fields: [servingEpcId], references: [id], onDelete: SetNull)
+  servingEpcName String?
 
   lastActivityAt DateTime?
   archivedAt     DateTime?
@@ -1063,6 +1068,7 @@ model Lead {
   @@index([kind])
   @@index([companyId])
   @@index([contactId])
+  @@index([servingEpcId])
   @@index([lastActivityAt])
   @@index([archivedAt])
   @@map("lead")
@@ -1100,6 +1106,11 @@ model MessageTemplate {
   channel              MessageTemplateChannel
   subject              String?
   body                 String
+  headerFormat         String?
+  headerText           String?
+  headerMediaUrl       String?
+  footer               String?
+  components           Json?
   providerTemplateName String?
   providerTemplateId   String?                @unique
   providerStatus       String?

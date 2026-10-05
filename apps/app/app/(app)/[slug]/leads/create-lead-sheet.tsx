@@ -33,6 +33,7 @@ type LeadKind = (typeof LEAD_BOARD.kinds)[number];
 type LeadStage = (typeof LEAD_BOARD.stages)[number];
 
 const NONE = "NONE";
+const OTHER_EPC = "OTHER";
 
 export function CreateLeadSheet() {
 	const trpc = useTRPC();
@@ -43,8 +44,14 @@ export function CreateLeadSheet() {
 	const [entity, setEntity] = useState(NONE);
 	const [ownerId, setOwnerId] = useState(NONE);
 	const [stage, setStage] = useState<LeadStage>("NOT_CONTACTED");
+	const [servingEpc, setServingEpc] = useState(NONE);
 
 	const owners = useQuery(trpc.leads.owners.queryOptions());
+	const isCustomer = kind === "CUSTOMER";
+	const epcs = useQuery({
+		...trpc.leads.epcOptions.queryOptions(),
+		enabled: open && isCustomer,
+	});
 	const hasDesignation = (
 		LEAD_BOARD.designationKinds as readonly string[]
 	).includes(kind);
@@ -58,6 +65,7 @@ export function CreateLeadSheet() {
 				setEntity(NONE);
 				setOwnerId(NONE);
 				setStage("NOT_CONTACTED");
+				setServingEpc(NONE);
 				void Promise.all([
 					queryClient.invalidateQueries({
 						queryKey: trpc.leads.board.queryKey(),
@@ -109,7 +117,7 @@ export function CreateLeadSheet() {
 						const name = text("name");
 						const companyName = text("companyName");
 						const phone = text("phone");
-						if (!name || !companyName || !phone) return;
+						if (!name || !phone || (!companyName && !isCustomer)) return;
 
 						create.mutate({
 							kind,
@@ -131,6 +139,14 @@ export function CreateLeadSheet() {
 							ownerId: ownerId === NONE ? undefined : ownerId,
 							stage,
 							notes: text("notes"),
+							servingEpcId:
+								isCustomer && servingEpc !== NONE && servingEpc !== OTHER_EPC
+									? servingEpc
+									: undefined,
+							servingEpcName:
+								isCustomer && servingEpc === OTHER_EPC
+									? text("servingEpcName")
+									: undefined,
 						});
 					}}
 				>
@@ -180,14 +196,47 @@ export function CreateLeadSheet() {
 							) : null}
 
 							<Field>
-								<FieldLabel htmlFor="lead-company">Company *</FieldLabel>
+								<FieldLabel htmlFor="lead-company">
+									{isCustomer ? "Company" : "Company *"}
+								</FieldLabel>
 								<Input
 									id="lead-company"
 									name="companyName"
 									placeholder="e.g. Tata Power Solar"
-									required
+									required={!isCustomer}
 								/>
 							</Field>
+
+							{isCustomer ? (
+								<Field>
+									<FieldLabel htmlFor="lead-serving-epc">
+										Serving EPC
+									</FieldLabel>
+									<Select onValueChange={setServingEpc} value={servingEpc}>
+										<SelectTrigger id="lead-serving-epc">
+											<SelectValue />
+										</SelectTrigger>
+										<SelectContent>
+											<SelectItem value={NONE}>Not set</SelectItem>
+											{(epcs.data ?? []).map((epc) => (
+												<SelectItem key={epc.id} value={epc.id}>
+													{epc.name}
+												</SelectItem>
+											))}
+											<SelectItem value={OTHER_EPC}>
+												Other (type the name)
+											</SelectItem>
+										</SelectContent>
+									</Select>
+									{servingEpc === OTHER_EPC ? (
+										<Input
+											aria-label="Serving EPC name"
+											name="servingEpcName"
+											placeholder="EPC company name"
+										/>
+									) : null}
+								</Field>
+							) : null}
 
 							<Field>
 								<FieldLabel htmlFor="lead-entity">Navirex entity</FieldLabel>

@@ -118,6 +118,10 @@ export function LeadSheet({ leadId }: { leadId: string }) {
 
 	const query = useQuery(trpc.leads.byId.queryOptions({ id: leadId }));
 	const owners = useQuery(trpc.leads.owners.queryOptions());
+	const epcs = useQuery({
+		...trpc.leads.epcOptions.queryOptions(),
+		enabled: query.data?.kind === "CUSTOMER",
+	});
 	const lead = query.data;
 
 	const { update, assign, convert } = useLeadMutations(leadId);
@@ -167,6 +171,16 @@ export function LeadSheet({ leadId }: { leadId: string }) {
 							onAssign={(ownerId) => assign.mutate({ id: lead.id, ownerId })}
 							onUpdate={(patch) => update.mutate({ id: lead.id, ...patch })}
 							ownerOptions={ownerOptions}
+							epcOptions={[
+								{ value: UNSET, label: "Not set" },
+								...(epcs.data ?? []).map((epc) => ({
+									value: epc.id,
+									label: epc.name,
+								})),
+							]}
+							onServingEpc={(servingEpcId) =>
+								update.mutate({ id: lead.id, servingEpcId })
+							}
 							saving={update.isPending || assign.isPending}
 						/>
 					),
@@ -279,12 +293,16 @@ export function LeadSheet({ leadId }: { leadId: string }) {
 function LeadOverview({
 	lead,
 	ownerOptions,
+	epcOptions,
 	onUpdate,
 	onAssign,
+	onServingEpc,
 	saving,
 }: {
 	lead: Lead;
 	ownerOptions: { value: string; label: string }[];
+	epcOptions: { value: string; label: string }[];
+	onServingEpc: (servingEpcId: string | null) => void;
 	onUpdate: (patch: Record<string, string | undefined>) => void;
 	onAssign: (ownerId: string | null) => void;
 	saving: boolean;
@@ -371,6 +389,27 @@ function LeadOverview({
 							saving={saving}
 							value={lead.companyName}
 						/>
+
+						{lead.kind === "CUSTOMER" ? (
+							<>
+								<InlineSelectField
+									label="Serving EPC"
+									onSave={(next) => onServingEpc(next === UNSET ? null : next)}
+									options={epcOptions}
+									saving={saving}
+									value={lead.servingEpc?.id ?? UNSET}
+								/>
+								{lead.servingEpc ? null : (
+									<InlineTextCell
+										label="Serving EPC (other)"
+										onSave={(next) => onUpdate({ servingEpcName: next })}
+										placeholder="Type an EPC not in the list"
+										saving={saving}
+										value={lead.servingEpcName}
+									/>
+								)}
+							</>
+						) : null}
 
 						<InlineTextCell
 							label="Email"

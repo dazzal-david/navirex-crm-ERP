@@ -41,12 +41,23 @@ import {
 import { useOpenRecord } from "@/components/crm/record-sheet/record-stack";
 import { WhatsAppAttachment } from "@/components/crm/whatsapp/whatsapp-attachment";
 import { WhatsAppMediaComposer } from "@/components/crm/whatsapp/whatsapp-media-composer";
+import {
+	templateDefaults,
+	templateReady,
+	WhatsAppTemplateFields,
+	type WhatsAppTemplateFieldsValue,
+} from "@/components/crm/whatsapp/whatsapp-template-fields";
+import { WhatsAppTemplatePreview } from "@/components/crm/whatsapp/whatsapp-template-preview";
 import { WhatsAppWindowAlert } from "@/components/crm/whatsapp/whatsapp-window-alert";
-import { templateVariablePositions } from "@/lib/communications/template-variables";
 import { useTRPC } from "@/lib/trpc/client";
+import type { RouterOutputs } from "@/lib/trpc/types";
 
 type Channel = "note" | "email" | "whatsapp";
-type TemplateVariable = { position: number; value: string };
+const EMPTY_TEMPLATE_VALUE: WhatsAppTemplateFieldsValue = {
+	fields: {},
+	headerMediaId: null,
+	headerMediaName: null,
+};
 
 export function CommunicationsInbox() {
 	const trpc = useTRPC();
@@ -68,12 +79,12 @@ export function CommunicationsInbox() {
 	const [subject, setSubject] = useState("Following up from Navirex");
 	const [body, setBody] = useState("");
 	const [emailFiles, setEmailFiles] = useState<EmailAttachmentFile[]>([]);
+
 	const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(
 		null,
 	);
-	const [templateVariables, setTemplateVariables] = useState<
-		TemplateVariable[]
-	>([]);
+	const [templateValue, setTemplateValue] =
+		useState<WhatsAppTemplateFieldsValue>(EMPTY_TEMPLATE_VALUE);
 	const leads = conversations.data ?? [];
 	const activeId = selectedId ?? leads[0]?.id ?? null;
 	const active = leads.find((lead) => lead.id === activeId) ?? null;
@@ -104,8 +115,9 @@ export function CommunicationsInbox() {
 		]);
 		setBody("");
 		setEmailFiles([]);
+
 		setSelectedTemplateId(null);
-		setTemplateVariables([]);
+		setTemplateValue(EMPTY_TEMPLATE_VALUE);
 	};
 	const note = useMutation(
 		trpc.communications.addNote.mutationOptions({
@@ -131,6 +143,7 @@ export function CommunicationsInbox() {
 	const pending = note.isPending || email.isPending || whatsapp.isPending;
 	const whatsappWindow = conversation.data?.whatsappWindow ?? null;
 	const usingWhatsAppTemplate = Boolean(selectedTemplate?.providerTemplateName);
+
 	const templatesOnly =
 		channel === "whatsapp" &&
 		whatsappWindow !== null &&
@@ -143,7 +156,8 @@ export function CommunicationsInbox() {
 				(body.trim() ||
 					(channel === "whatsapp" && selectedTemplate?.providerTemplateName)),
 		) &&
-		templateVariables.every((variable) => variable.value.trim()) &&
+		(!usingWhatsAppTemplate ||
+			templateReady(selectedTemplate?.components ?? null, templateValue)) &&
 		(channel === "note" ||
 			(channel === "email" &&
 				Boolean(status.data?.email.google || status.data?.email.microsoft)) ||
@@ -208,57 +222,10 @@ export function CommunicationsInbox() {
 										{conversation.data?.items.length ? (
 											conversation.data.items.map((item) => (
 												<MessageScrollerItem key={item.id}>
-													{item.direction === "internal" ? (
-														<Marker variant="separator">
-															<MarkerContent>Internal note</MarkerContent>
-														</Marker>
-													) : null}
-													<Message
-														align={
-															item.direction === "outbound" ? "end" : "start"
-														}
-													>
-														<MessageContent>
-															<MessageHeader>
-																{channelLabel(item.channel)}
-																{item.subject ? ` · ${item.subject}` : ""}
-															</MessageHeader>
-															<Bubble
-																variant={
-																	item.direction === "outbound"
-																		? "tinted"
-																		: item.direction === "internal"
-																			? "muted"
-																			: "outline"
-																}
-															>
-																<BubbleContent className="flex flex-col gap-2 whitespace-pre-wrap">
-																	{item.attachment ? (
-																		<WhatsAppAttachment
-																			attachment={item.attachment}
-																		/>
-																	) : null}
-																	{item.attachment && /^\[.*\]$/.test(item.body)
-																		? null
-																		: item.body}
-																	{item.fileNames.length > 0 ? (
-																		<span className="text-muted-foreground text-xs">
-																			Attached: {item.fileNames.join(", ")}
-																		</span>
-																	) : null}
-																</BubbleContent>
-															</Bubble>
-															<MessageFooter>
-																{item.authorName ?? active.name} ·{" "}
-																{new Date(item.occurredAt).toLocaleString()}
-																{item.deliveryStatus === "failed"
-																	? ` · Not delivered${item.deliveryError ? `: ${item.deliveryError}` : ""}`
-																	: item.deliveryStatus === "read"
-																		? " · Read"
-																		: ""}
-															</MessageFooter>
-														</MessageContent>
-													</Message>
+													<ConversationBubble
+														item={item}
+														leadName={active.name}
+													/>
 												</MessageScrollerItem>
 											))
 										) : (
@@ -281,7 +248,7 @@ export function CommunicationsInbox() {
 										onClick={() => {
 											setChannel(value);
 											setSelectedTemplateId(null);
-											setTemplateVariables([]);
+											setTemplateValue(EMPTY_TEMPLATE_VALUE);
 										}}
 									>
 										<Icon
@@ -304,14 +271,7 @@ export function CommunicationsInbox() {
 										);
 										if (!template) return;
 										setSelectedTemplateId(template.id);
-										setTemplateVariables(
-											template.channel === "WHATSAPP" &&
-												template.providerTemplateName
-												? templateVariablePositions(template.body).map(
-														(position) => ({ position, value: "" }),
-													)
-												: [],
-										);
+										setTemplateValue(templateDefaults(template.components));
 										setChannel(template.channel.toLowerCase() as Channel);
 										setSubject(template.subject ?? "Following up from Navirex");
 										setBody(template.body);
@@ -344,20 +304,30 @@ export function CommunicationsInbox() {
 									placeholder="Subject"
 								/>
 							) : null}
-							<Textarea
-								rows={3}
-								value={body}
-								onChange={(event) => setBody(event.target.value)}
-								readOnly={Boolean(selectedTemplate?.providerTemplateName)}
-								disabled={templatesOnly}
-								placeholder={
-									templatesOnly
-										? "Pick an approved template from “Use template” to message this lead."
-										: channel === "note"
-											? "Add an internal note…"
-											: "Write a message…"
-								}
-							/>
+							{usingWhatsAppTemplate && selectedTemplate ? (
+								<div className="flex flex-col gap-2">
+									<WhatsAppTemplatePreview template={selectedTemplate} />
+									<WhatsAppTemplateFields
+										components={selectedTemplate.components}
+										onChange={setTemplateValue}
+										value={templateValue}
+									/>
+								</div>
+							) : (
+								<Textarea
+									rows={3}
+									value={body}
+									onChange={(event) => setBody(event.target.value)}
+									disabled={templatesOnly}
+									placeholder={
+										templatesOnly
+											? "Pick an approved template from “Use template” to message this lead."
+											: channel === "note"
+												? "Add an internal note…"
+												: "Write a message…"
+									}
+								/>
+							)}
 							{channel === "whatsapp" && activeId ? (
 								<div className="mt-2">
 									<WhatsAppMediaComposer
@@ -381,39 +351,15 @@ export function CommunicationsInbox() {
 									/>
 								</div>
 							) : null}
-							{templateVariables.length > 0 ? (
-								<div className="mt-2 grid gap-2 sm:grid-cols-2">
-									{templateVariables.map((variable) => (
-										<Input
-											key={variable.position}
-											value={variable.value}
-											placeholder={`Template value ${variable.position}`}
-											onChange={(event) =>
-												setTemplateVariables((current) =>
-													current.map((item) =>
-														item.position === variable.position
-															? { ...item, value: event.target.value }
-															: item,
-													),
-												)
-											}
-										/>
-									))}
-								</div>
-							) : null}
+
 							<div className="mt-2 flex items-center justify-between gap-3">
 								<p className="text-muted-foreground text-xs">
-									{templatesOnly
-										? "Only templates can be sent to this lead right now"
-										: channel === "note"
-											? "Visible only to your team"
-											: channel === "email" && status.data?.email.sender
-												? `Send from ${status.data.email.sender}`
-												: channel === "email" && !canSend
-													? "Connect email sending if unavailable"
-													: channel === "whatsapp" && !canSend
-														? "Configure WhatsApp if unavailable"
-														: `Send via ${channelLabel(channel)}`}
+									{composerHint({
+										channel,
+										templatesOnly,
+										canSend,
+										sender: status.data?.email.sender ?? null,
+									})}
 								</p>
 								<Button
 									disabled={!canSend || pending}
@@ -440,9 +386,10 @@ export function CommunicationsInbox() {
 															mode: "template",
 															templateName: providerName,
 															language: selectedTemplate.language,
-															variables: templateVariables.map(
-																(variable) => variable.value,
-															),
+															variables: [],
+															fields: templateValue.fields,
+															headerMediaId:
+																templateValue.headerMediaId ?? undefined,
 														}
 													: {
 															leadId: activeId,
@@ -476,4 +423,85 @@ function channelLabel(channel: Channel): string {
 		: channel === "whatsapp"
 			? "WhatsApp"
 			: "Note";
+}
+
+type ConversationItem = NonNullable<
+	RouterOutputs["communications"]["conversation"]
+>["items"][number];
+
+function ConversationBubble({
+	item,
+	leadName,
+}: {
+	item: ConversationItem;
+	leadName: string;
+}) {
+	return (
+		<>
+			{item.direction === "internal" ? (
+				<Marker variant="separator">
+					<MarkerContent>Internal note</MarkerContent>
+				</Marker>
+			) : null}
+			<Message align={item.direction === "outbound" ? "end" : "start"}>
+				<MessageContent>
+					<MessageHeader>
+						{channelLabel(item.channel)}
+						{item.subject ? ` · ${item.subject}` : ""}
+					</MessageHeader>
+					<Bubble
+						variant={
+							item.direction === "outbound"
+								? "tinted"
+								: item.direction === "internal"
+									? "muted"
+									: "outline"
+						}
+					>
+						<BubbleContent className="flex flex-col gap-2 whitespace-pre-wrap">
+							{item.attachment ? (
+								<WhatsAppAttachment attachment={item.attachment} />
+							) : null}
+							{item.attachment && /^\[.*\]$/.test(item.body) ? null : item.body}
+							{item.fileNames.length > 0 ? (
+								<span className="text-muted-foreground text-xs">
+									Attached: {item.fileNames.join(", ")}
+								</span>
+							) : null}
+						</BubbleContent>
+					</Bubble>
+					<MessageFooter>
+						{item.authorName ?? leadName} ·{" "}
+						{new Date(item.occurredAt).toLocaleString()}
+						{item.deliveryStatus === "failed"
+							? ` · Not delivered${item.deliveryError ? `: ${item.deliveryError}` : ""}`
+							: item.deliveryStatus === "read"
+								? " · Read"
+								: ""}
+					</MessageFooter>
+				</MessageContent>
+			</Message>
+		</>
+	);
+}
+
+function composerHint({
+	channel,
+	templatesOnly,
+	canSend,
+	sender,
+}: {
+	channel: Channel;
+	templatesOnly: boolean;
+	canSend: boolean;
+	sender: string | null;
+}): string {
+	if (templatesOnly) return "Only templates can be sent to this lead right now";
+	if (channel === "note") return "Visible only to your team";
+	if (channel === "email" && sender) return `Send from ${sender}`;
+	if (channel === "email" && !canSend)
+		return "Connect email sending if unavailable";
+	if (channel === "whatsapp" && !canSend)
+		return "Configure WhatsApp if unavailable";
+	return `Send via ${channelLabel(channel)}`;
 }
