@@ -434,7 +434,7 @@ function leadStage(value: string, converted: string) {
 	if (/not qualified|junk/.test(normalized)) return "NOT_QUALIFIED" as const;
 	if (/lost|reject/.test(normalized)) return "NOT_INTERESTED" as const;
 	if (/pre-qualified|interest|hot/.test(normalized))
-		return "INTERESTED" as const;
+		return "CONTACTED" as const;
 	if (/future|follow/.test(normalized)) return "FOLLOW_UP" as const;
 	if (/contacted|attempted/.test(normalized)) return "CONTACTED" as const;
 	if (/qualified|approve|convert|won/.test(normalized))

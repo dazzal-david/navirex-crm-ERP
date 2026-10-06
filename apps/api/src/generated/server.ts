@@ -16,7 +16,7 @@ const publicProcedure = t.procedure;
 import { timelineInput, timelineOutput, timelineCountsInput, timelineCountsOutput, myTasksInput, myTasksOutput, activityCreateInput, activityCreateOutput, completeInput, completeOutput } from "../activities/activities.contracts";
 import { agentListOutput, agentReviseInput, agentReviseOutput, agentIdInput, agentFilesOutput, agentSaveFileInput, agentSaveFileOutput, agentByIdOutput, agentHistoryInput, agentHistoryOutput, agentActivityOutput, agentUpdateInput, agentUpdateOutput, agentDeployInput, agentDeployOutput, agentPauseOutput, agentResumeOutput, agentArchiveOutput, agentRestoreOutput, agentRemoveOutput, agentRunNowInput, agentRunNowOutput, agentRetryRunInput, agentRetryRunOutput, agentCancelRunInput, agentCancelRunOutput } from "../agent/agents.contracts";
 import { apiKeyListInput, apiKeyListOutput, createApiKeyInput, createApiKeyOutput, revokeApiKeyInput, revokeApiKeyOutput } from "../api-keys/api-keys.contracts";
-import { communicationStatusOutput, conversationsOutput, conversationInput, conversationOutput, whatsappWindowOutput, addNoteInput, addNoteOutput, sendEmailInput, sendMessageOutput, sendWhatsAppInput } from "../communications/communications.contracts";
+import { communicationStatusOutput, conversationsOutput, unreadOutput, conversationInput, markReadOutput, leadNotesOutput, conversationOutput, whatsappWindowOutput, addNoteInput, addNoteOutput, sendEmailInput, sendMessageOutput, sendWhatsAppInput } from "../communications/communications.contracts";
 import { companyListInput, companyListOutput, companyIdInput, companyDetailOutput, companyOptionsInput, companyOptionOutput, companyCreateInput, companySummaryOutput, companyUpdateArgs, companyArchiveResultOutput, companyBulkOwnerInput, companyBulkResultOutput, companyBulkInput, companyEnrichOutput, companyResearchOutput, setPrimaryContactInput, companySetPrimaryContactOutput } from "../companies/companies.contracts";
 import { contactListInput, contactListOutput, contactIdInput, contactByIdOutput, contactCreateInput, contactBasicOutput, contactUpdateArgs, contactNameOutput, contactEnrichOutput, contactBulkOwnerInput, bulkResultOutput, contactBulkCompanyInput, contactBulkInput, factDecisionInput, decideFactOutput } from "../contacts/contacts.contracts";
 import { conversationListInput, conversationListOutput, builderListOutput, builderResourceSearchInput, builderResourcesOutput, conversationIdInput, builderConversationDetailOutput, conversationEventsInput, conversationEventsOutput, conversationSaveInput, conversationIdOutput, builderConversationCreateInput, builderConversationSubmitInput, builderQuestionResponseInput, builderResponseRatingInput, builderResponseRatingOutput, conversationShareStatusOutput, conversationShareTokenOutput, sharedConversationInput, sharedConversationOutput } from "../conversations/conversations.contracts";
@@ -153,6 +153,17 @@ const appRouter = t.router({
       .query(async () => "PLACEHOLDER_DO_NOT_REMOVE" as any),
     conversations: publicProcedure
       .output(conversationsOutput)
+      .query(async () => "PLACEHOLDER_DO_NOT_REMOVE" as any),
+    unread: publicProcedure
+      .output(unreadOutput)
+      .query(async () => "PLACEHOLDER_DO_NOT_REMOVE" as any),
+    markRead: publicProcedure
+      .input(conversationInput)
+      .output(markReadOutput)
+      .mutation(async () => "PLACEHOLDER_DO_NOT_REMOVE" as any),
+    notes: publicProcedure
+      .input(conversationInput)
+      .output(leadNotesOutput)
       .query(async () => "PLACEHOLDER_DO_NOT_REMOVE" as any),
     conversation: publicProcedure
       .input(conversationInput)

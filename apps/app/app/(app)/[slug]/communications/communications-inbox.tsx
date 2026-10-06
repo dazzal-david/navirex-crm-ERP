@@ -4,6 +4,7 @@ import Chat from "@carbon/icons-react/es/Chat";
 import Email from "@carbon/icons-react/es/Email";
 import Notes from "@carbon/icons-react/es/Notebook";
 import UserProfile from "@carbon/icons-react/es/UserProfile";
+import { Badge } from "@crm/ui/components/badge";
 import { Bubble, BubbleContent } from "@crm/ui/components/bubble";
 import { Button } from "@crm/ui/components/button";
 import { Icon } from "@crm/ui/components/icon";
@@ -32,7 +33,7 @@ import {
 } from "@crm/ui/components/select";
 import { Textarea } from "@crm/ui/components/textarea";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import {
 	type EmailAttachmentFile,
@@ -96,6 +97,33 @@ export function CommunicationsInbox() {
 		refetchInterval: activeId === null ? false : 3_000,
 		refetchIntervalInBackground: false,
 	});
+	const markRead = useMutation(
+		trpc.communications.markRead.mutationOptions({
+			onSuccess: () =>
+				Promise.all([
+					queryClient.invalidateQueries({
+						queryKey: trpc.communications.conversations.queryKey(),
+					}),
+					queryClient.invalidateQueries({
+						queryKey: trpc.communications.unread.queryKey(),
+					}),
+				]),
+		}),
+	);
+	const activeUnread = active?.unread ?? 0;
+	const conversationLoaded = conversation.isSuccess;
+	const { mutate: markConversationRead, isPending: marking } = markRead;
+	useEffect(() => {
+		if (!activeId || activeUnread === 0 || !conversationLoaded || marking)
+			return;
+		markConversationRead({ leadId: activeId });
+	}, [
+		activeId,
+		activeUnread,
+		conversationLoaded,
+		marking,
+		markConversationRead,
+	]);
 	const visible = leads.filter((lead) =>
 		`${lead.name} ${lead.companyName ?? ""} ${lead.email ?? ""}`
 			.toLowerCase()
@@ -182,7 +210,21 @@ export function CommunicationsInbox() {
 							onClick={() => setSelectedId(lead.id)}
 							type="button"
 						>
-							<span className="truncate font-medium text-sm">{lead.name}</span>
+							<span className="flex items-center gap-2">
+								<span
+									className="truncate font-medium text-sm data-[unread=true]:font-semibold"
+									data-unread={lead.unread > 0}
+								>
+									{lead.name}
+								</span>
+								{lead.unread > 0 ? (
+									<span className="ml-auto">
+										<Badge aria-label={`${lead.unread} unread messages`}>
+											{lead.unread}
+										</Badge>
+									</span>
+								) : null}
+							</span>
 							<span className="truncate text-muted-foreground text-xs">
 								{lead.preview ??
 									lead.companyName ??

@@ -15,6 +15,9 @@ export const WHATSAPP = {
 		document: "application/pdf",
 	},
 	windowClosedCodes: [131047],
+	webhookFields: ["messages", "smb_message_echoes"],
+	conversationLimit: 250,
+	noteLimit: 500,
 	mediaKinds: {
 		image: ["image/jpeg", "image/png"],
 		video: ["video/mp4", "video/3gpp"],

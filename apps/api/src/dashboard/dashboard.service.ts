@@ -31,7 +31,6 @@ const DAY_LABEL = new Intl.DateTimeFormat("en-US", {
 const ACTIVE_LEAD_STAGES = [
 	LeadStage.NOT_CONTACTED,
 	LeadStage.CONTACTED,
-	LeadStage.INTERESTED,
 	LeadStage.FOLLOW_UP,
 ] as const;
 const ACTIVE_LEAD_STAGE_SET = new Set<LeadStage>(ACTIVE_LEAD_STAGES);

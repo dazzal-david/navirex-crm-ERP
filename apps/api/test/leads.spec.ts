@@ -300,11 +300,10 @@ describe("the lead board", () => {
 
 		const board = await service.board({}, userId);
 
-		expect(board.columns).toHaveLength(7);
+		expect(board.columns).toHaveLength(6);
 		expect(board.columns.map((column) => column.stage)).toEqual([
 			"NOT_CONTACTED",
 			"CONTACTED",
-			"INTERESTED",
 			"FOLLOW_UP",
 			"ONBOARDED",
 			"NOT_INTERESTED",
@@ -351,7 +350,7 @@ describe("the lead board", () => {
 		expect(summary.totals.all).toBe(1);
 		expect(summary.totals.active).toBe(1);
 		expect(summary.totals.needsAttention).toBe(1);
-		expect(summary.stages).toHaveLength(7);
+		expect(summary.stages).toHaveLength(6);
 		expect(summary.sources[0]).toEqual({
 			source: "Website form",
 			count: 1,
@@ -391,7 +390,7 @@ describe("the lead board", () => {
 			userId,
 		);
 		const repeat = await service.importZoho(
-			[{ zohoId, name: `Updated ${suffix}`, stage: "INTERESTED" }],
+			[{ zohoId, name: `Updated ${suffix}`, stage: "FOLLOW_UP" }],
 			userId,
 		);
 		const lead = await db.lead.findUniqueOrThrow({ where: { zohoId } });
@@ -399,6 +398,6 @@ describe("the lead board", () => {
 		expect(first).toMatchObject({ created: 1, updated: 0, failed: 0 });
 		expect(repeat).toMatchObject({ created: 0, updated: 1, failed: 0 });
 		expect(lead.name).toBe(`Updated ${suffix}`);
-		expect(lead.stage).toBe("INTERESTED");
+		expect(lead.stage).toBe("FOLLOW_UP");
 	});
 });

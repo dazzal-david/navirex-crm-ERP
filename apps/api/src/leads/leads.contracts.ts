@@ -3,7 +3,6 @@ import { z } from "zod";
 export const LEAD_STAGES = [
 	"NOT_CONTACTED",
 	"CONTACTED",
-	"INTERESTED",
 	"FOLLOW_UP",
 	"ONBOARDED",
 	"NOT_INTERESTED",
@@ -90,7 +89,7 @@ export const boardOutput = z.object({
 
 const optionalEmail = z.email().max(320).optional().or(z.literal(""));
 
-export const leadCreateInput = z.object({
+const leadFields = z.object({
 	name: z.string().trim().min(1).max(200),
 	designation: z.string().trim().max(200).optional(),
 	companyName: z.string().trim().max(200).optional(),
@@ -99,9 +98,9 @@ export const leadCreateInput = z.object({
 	phone: z.string().trim().max(50).optional(),
 	secondaryPhone: z.string().trim().max(50).optional(),
 	website: z.string().trim().max(500).optional(),
-	kind: leadKind.default("EPC"),
+	kind: leadKind,
 	entity: navirexEntity.optional(),
-	stage: leadStage.default("NOT_CONTACTED"),
+	stage: leadStage,
 	ownerId: z.string().optional(),
 	source: z.string().trim().max(120).optional(),
 	country: z.string().trim().max(120).optional(),
@@ -111,6 +110,11 @@ export const leadCreateInput = z.object({
 	notes: z.string().trim().max(5000).optional(),
 	servingEpcId: z.string().nullable().optional(),
 	servingEpcName: z.string().trim().max(200).optional(),
+});
+
+export const leadCreateInput = leadFields.extend({
+	kind: leadKind.default("EPC"),
+	stage: leadStage.default("NOT_CONTACTED"),
 });
 
 export const leadIntakeInput = leadCreateInput
@@ -126,7 +130,7 @@ export const leadIntakeOutput = z.object({
 	created: z.boolean(),
 });
 
-export const zohoLeadRow = leadCreateInput.partial().extend({
+export const zohoLeadRow = leadFields.partial().extend({
 	zohoId: z.string().trim().min(1).max(200),
 	name: z.string().trim().min(1).max(200),
 });
@@ -147,9 +151,7 @@ export const zohoImportOutput = z.object({
 	),
 });
 
-export const leadUpdateInput = leadCreateInput
-	.partial()
-	.extend({ id: z.string() });
+export const leadUpdateInput = leadFields.partial().extend({ id: z.string() });
 
 export const leadIdInput = z.object({ id: z.string() });
 

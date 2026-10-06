@@ -67,6 +67,7 @@ export const conversationSummary = z.object({
 	source: z.string().nullable(),
 	lastActivityAt: z.date().nullable(),
 	preview: z.string().nullable(),
+	unread: z.number().int(),
 });
 
 export const conversationItem = z.object({
@@ -100,7 +101,7 @@ export const whatsappWindowOutput = z.object({
 export const conversationsOutput = z.array(conversationSummary);
 
 export const conversationOutput = z.object({
-	lead: conversationSummary.omit({ preview: true }),
+	lead: conversationSummary.omit({ preview: true, unread: true }),
 	items: z.array(conversationItem),
 	whatsappWindow: whatsappWindowOutput,
 });
@@ -111,6 +112,19 @@ export const addNoteInput = z.object({
 });
 
 export const addNoteOutput = z.object({ id: z.string() });
+
+export const leadNote = z.object({
+	id: z.string(),
+	body: z.string(),
+	authorName: z.string(),
+	occurredAt: z.date(),
+});
+
+export const leadNotesOutput = z.array(leadNote);
+
+export const unreadOutput = z.object({ conversations: z.number().int() });
+
+export const markReadOutput = z.object({ readAt: z.date() });
 
 export const pinnedTemplateInput = z.object({
 	userId: z.string(),

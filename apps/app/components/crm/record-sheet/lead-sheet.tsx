@@ -12,7 +12,6 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
 	InlineSelectField,
-	InlineTextArea,
 	InlineTextCell,
 } from "@/components/crm/inline-field";
 import { Timeline } from "@/components/crm/timeline/timeline";
@@ -31,6 +30,7 @@ import { useCrmCache } from "@/lib/trpc/cache";
 import { useTRPC } from "@/lib/trpc/client";
 import type { RouterOutputs } from "@/lib/trpc/types";
 import { LeadCommunicationActions } from "./lead-communications";
+import { LeadNotes } from "./lead-notes";
 import { RecordSheetFrame } from "./record-parts";
 import {
 	useOpenRecord,
@@ -370,6 +370,16 @@ function LeadOverview({
 			<DetailSheetSection className="py-5" title="Contact details">
 				<div className="rounded-2xl border bg-card p-4 shadow-xs">
 					<DetailSheetProperties>
+						<InlineTextCell
+							label="Name"
+							onSave={(next) => {
+								if (next) onUpdate({ name: next });
+							}}
+							placeholder="Add a name"
+							saving={saving}
+							value={lead.name}
+						/>
+
 						{(LEAD_BOARD.designationKinds as readonly string[]).includes(
 							lead.kind,
 						) ? (
@@ -493,15 +503,7 @@ function LeadOverview({
 			</DetailSheetSection>
 
 			<DetailSheetSection className="py-5" title="Notes">
-				<div className="rounded-2xl border bg-amber-50/50 p-3 dark:bg-amber-950/10">
-					<InlineTextArea
-						label="Notes"
-						onSave={(next) => onUpdate({ notes: next })}
-						placeholder="What matters about this lead?"
-						saving={saving}
-						value={lead.notes}
-					/>
-				</div>
+				<LeadNotes leadId={lead.id} />
 			</DetailSheetSection>
 		</DetailSheetBody>
 	);

@@ -4,7 +4,6 @@ export const LEAD_BOARD = {
 	stages: [
 		"NOT_CONTACTED",
 		"CONTACTED",
-		"INTERESTED",
 		"FOLLOW_UP",
 		"ONBOARDED",
 		"NOT_INTERESTED",
@@ -13,7 +12,6 @@ export const LEAD_BOARD = {
 	label: {
 		NOT_CONTACTED: "Not contacted",
 		CONTACTED: "Contacted",
-		INTERESTED: "Interested",
 		FOLLOW_UP: "Follow-up",
 		ONBOARDED: "Onboarded",
 		NOT_INTERESTED: "Not interested",

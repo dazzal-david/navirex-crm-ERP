@@ -16,6 +16,7 @@ const whatsappContact = z.object({
 export const whatsappMessage = z
 	.object({
 		from: z.string().optional(),
+		to: z.string().optional(),
 		id: z.string().min(1),
 		timestamp: z.string().optional(),
 		type: z.string().min(1),
@@ -74,6 +75,7 @@ const whatsappValue = z
 	.object({
 		contacts: z.array(whatsappContact).optional(),
 		messages: z.array(whatsappMessage).optional(),
+		message_echoes: z.array(whatsappMessage).optional(),
 		metadata: z
 			.object({
 				display_phone_number: z.string().optional(),
@@ -92,7 +94,7 @@ export const whatsappWebhookPayload = z.object({
 				id: z.string().optional(),
 				changes: z.array(
 					z.object({
-						field: z.literal("messages"),
+						field: z.string(),
 						value: whatsappValue,
 					}),
 				),

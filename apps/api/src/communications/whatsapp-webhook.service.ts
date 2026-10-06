@@ -7,6 +7,7 @@ import type { EnvironmentVariables } from "../config/env.validation";
 import { InjectDatabase } from "../database/database.constants";
 import { LeadsService } from "../leads/leads.service";
 import { metaSignatureMatches } from "../meta/meta-signature";
+import { WHATSAPP } from "./whatsapp-config";
 import {
 	type WhatsAppMediaRef,
 	type WhatsAppWebhookPayload,
@@ -80,6 +81,7 @@ export class WhatsAppWebhookService {
 	async receive(payload: WhatsAppWebhookPayload): Promise<void> {
 		for (const entry of payload.entry) {
 			for (const change of entry.changes) {
+				if (!isMessageField(change.field)) continue;
 				const value = change.value;
 				if (
 					this.phoneNumberId &&
@@ -110,15 +112,30 @@ export class WhatsAppWebhookService {
 
 				for (const message of value.messages ?? []) {
 					if (!message.from) continue;
-					await this.storeMessage(
-						message.id,
-						message.from,
-						names.get(normalizePhone(message.from)),
-						message.type,
-						whatsappMessageBody(message),
-						whatsappTimestamp(message.timestamp),
-						whatsappMediaOf(message),
-					);
+					await this.storeMessage({
+						messageId: message.id,
+						direction: "inbound",
+						phone: message.from,
+						name: names.get(normalizePhone(message.from)),
+						messageType: message.type,
+						body: whatsappMessageBody(message),
+						occurredAt: whatsappTimestamp(message.timestamp),
+						media: whatsappMediaOf(message),
+					});
+				}
+
+				for (const message of value.message_echoes ?? []) {
+					if (!message.to) continue;
+					await this.storeMessage({
+						messageId: message.id,
+						direction: "outbound",
+						phone: message.to,
+						name: names.get(normalizePhone(message.to)),
+						messageType: message.type,
+						body: whatsappMessageBody(message),
+						occurredAt: whatsappTimestamp(message.timestamp),
+						media: whatsappMediaOf(message),
+					});
 				}
 
 				for (const status of value.statuses ?? []) {
@@ -133,15 +150,25 @@ export class WhatsAppWebhookService {
 		}
 	}
 
-	private async storeMessage(
-		messageId: string,
-		from: string,
-		fromName: string | undefined,
-		messageType: string,
-		body: string,
-		occurredAt: Date,
-		media: WhatsAppMediaRef | null,
-	): Promise<void> {
+	private async storeMessage({
+		messageId,
+		direction,
+		phone: from,
+		name: fromName,
+		messageType,
+		body,
+		occurredAt,
+		media,
+	}: {
+		messageId: string;
+		direction: "inbound" | "outbound";
+		phone: string;
+		name: string | undefined;
+		messageType: string;
+		body: string;
+		occurredAt: Date;
+		media: WhatsAppMediaRef | null;
+	}): Promise<void> {
 		const phone = normalizePhone(from);
 		if (!phone) return;
 		const candidates = await this.db.lead.findMany({
@@ -159,7 +186,6 @@ export class WhatsAppWebhookService {
 				stage: "NOT_CONTACTED",
 				source: "WhatsApp",
 				externalId: phone,
-				notes: body,
 			});
 			const createdLead = await this.db.lead.findUnique({
 				where: { id: result.id },
@@ -197,9 +223,10 @@ export class WhatsAppWebhookService {
 					occurredAt,
 					meta: {
 						channel: "whatsapp",
-						direction: "inbound",
-						from: phone,
-						fromName: fromName ?? null,
+						direction,
+						...(direction === "inbound"
+							? { from: phone, fromName: fromName ?? null }
+							: { to: phone, mode: "phone" }),
 						messageId,
 						messageType,
 						provider: "meta",
@@ -245,6 +272,10 @@ export class WhatsAppWebhookService {
 			},
 		});
 	}
+}
+
+function isMessageField(field: string): boolean {
+	return (WHATSAPP.webhookFields as readonly string[]).includes(field);
 }
 
 function normalizePhone(value: string): string {

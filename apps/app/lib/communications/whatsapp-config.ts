@@ -29,4 +29,6 @@ export const WHATSAPP_UI = {
 	],
 	voiceNote: { kbps: 64, frameSamples: 1152, filename: "voice-note.mp3" },
 	windowRefreshMs: 60_000,
+	unreadPollMs: 15_000,
+	unreadBadgeMax: 99,
 } as const;

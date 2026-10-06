@@ -143,3 +143,28 @@ describe("WhatsApp webhook payloads", () => {
 		);
 	});
 });
+
+describe("WhatsApp webhook fields", () => {
+	it("accepts events that carry no messages, such as template status updates", () => {
+		const payload = whatsappWebhookPayload.safeParse({
+			object: "whatsapp_business_account",
+			entry: [
+				{
+					id: "waba-1",
+					changes: [
+						{
+							field: "message_template_status_update",
+							value: {
+								event: "APPROVED",
+								message_template_id: 1,
+								message_template_name: "welcome",
+							},
+						},
+					],
+				},
+			],
+		});
+
+		expect(payload.success).toBe(true);
+	});
+});

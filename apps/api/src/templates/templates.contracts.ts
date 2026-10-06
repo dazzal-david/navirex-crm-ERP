@@ -50,16 +50,20 @@ export const metaTemplateSyncOutput = z.object({
 	syncedAt: z.date(),
 });
 
-export const templateCreateInput = z.object({
+const templateFields = z.object({
 	name: z.string().trim().min(1).max(120),
 	channel: templateChannel,
 	subject: z.string().trim().max(300).optional(),
 	body: z.string().trim().min(1).max(50_000),
 	providerTemplateName: z.string().trim().max(512).optional(),
-	language: z.string().trim().min(2).max(20).default("en_US"),
+	language: z.string().trim().min(2).max(20),
 });
 
-export const templateUpdateInput = templateCreateInput.partial().extend({
+export const templateCreateInput = templateFields.extend({
+	language: templateFields.shape.language.default("en_US"),
+});
+
+export const templateUpdateInput = templateFields.partial().extend({
 	id: z.string(),
 	active: z.boolean().optional(),
 });

@@ -24,23 +24,24 @@ model User {
   sessions      Session[]
   accounts      Account[]
 
-  ownedCompanies         Company[]            @relation("CompanyOwner")
-  ownedContacts          Contact[]            @relation("ContactOwner")
-  ownedDeals             Deal[]               @relation("DealOwner")
-  ownedLeads             Lead[]               @relation("LeadOwner")
-  activities             Activity[]           @relation("ActivityAuthor")
+  ownedCompanies         Company[]              @relation("CompanyOwner")
+  ownedContacts          Contact[]              @relation("ContactOwner")
+  ownedDeals             Deal[]                 @relation("DealOwner")
+  ownedLeads             Lead[]                 @relation("LeadOwner")
+  leadReads              LeadConversationRead[]
+  activities             Activity[]             @relation("ActivityAuthor")
   mailboxSyncs           MailboxSync[]
-  factDecisions          ContactFact[]        @relation("FactDecider")
-  conversations          AgentConversation[]  @relation("ConversationOwner")
-  fieldValues            FieldValue[]         @relation("FieldValueUser")
-  savedViews             SavedView[]          @relation("SavedViewOwner")
-  metaPageConnections    MetaPageConnection[] @relation("MetaConnectionOwner")
-  messageTemplates       MessageTemplate[]    @relation("MessageTemplateCreator")
-  inboundWebhooks        InboundWebhook[]     @relation("InboundWebhookCreator")
-  employeeProfile        EmployeeProfile?     @relation("EmployeeProfileUser")
-  managedEmployees       EmployeeProfile[]    @relation("EmployeeProfileManager")
-  reimbursements         Reimbursement[]      @relation("ReimbursementEmployee")
-  reviewedReimbursements Reimbursement[]      @relation("ReimbursementReviewer")
+  factDecisions          ContactFact[]          @relation("FactDecider")
+  conversations          AgentConversation[]    @relation("ConversationOwner")
+  fieldValues            FieldValue[]           @relation("FieldValueUser")
+  savedViews             SavedView[]            @relation("SavedViewOwner")
+  metaPageConnections    MetaPageConnection[]   @relation("MetaConnectionOwner")
+  messageTemplates       MessageTemplate[]      @relation("MessageTemplateCreator")
+  inboundWebhooks        InboundWebhook[]       @relation("InboundWebhookCreator")
+  employeeProfile        EmployeeProfile?       @relation("EmployeeProfileUser")
+  managedEmployees       EmployeeProfile[]      @relation("EmployeeProfileManager")
+  reimbursements         Reimbursement[]        @relation("ReimbursementEmployee")
+  reviewedReimbursements Reimbursement[]        @relation("ReimbursementReviewer")
 
   createdAgentDefinitions AgentDefinition[]             @relation("AgentDefinitionCreator")
   createdAgentVersions    AgentVersion[]                @relation("AgentVersionCreator")
@@ -985,7 +986,6 @@ model Deal {
 enum LeadStage {
   NOT_CONTACTED
   CONTACTED
-  INTERESTED
   FOLLOW_UP
   ONBOARDED
   NOT_INTERESTED
@@ -1057,8 +1057,9 @@ model Lead {
 
   activities      Activity[]
   formSubmissions FormSubmission[]
-  createdAt       DateTime         @default(now())
-  updatedAt       DateTime         @updatedAt
+  reads           LeadConversationRead[]
+  createdAt       DateTime               @default(now())
+  updatedAt       DateTime               @updatedAt
 
   @@unique([zohoId])
   @@unique([source, externalId])
@@ -1072,6 +1073,18 @@ model Lead {
   @@index([lastActivityAt])
   @@index([archivedAt])
   @@map("lead")
+}
+
+model LeadConversationRead {
+  userId String
+  user   User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  leadId String
+  lead   Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  readAt DateTime
+
+  @@id([userId, leadId])
+  @@index([leadId])
+  @@map("leadConversationRead")
 }
 
 model MetaPageConnection {

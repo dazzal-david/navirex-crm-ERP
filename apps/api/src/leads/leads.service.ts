@@ -261,7 +261,12 @@ export class LeadsService {
 			return created;
 		});
 
-		await this.log(lead.id, userId, `Lead created in ${stage}.`);
+		await this.log(
+			lead.id,
+			userId,
+			`Lead created in ${LEADS.stageLabel[stage]}.`,
+		);
+		await this.addNote(lead.id, userId, input.notes);
 
 		return lead;
 	}
@@ -290,11 +295,11 @@ export class LeadsService {
 		});
 
 		if (existing) {
-			await this.logAutomated(
-				existing.id,
-				userId,
-				`Lead intake matched ${source}.`,
-			);
+			const authorId = await this.automatedAuthor(userId);
+			if (authorId) {
+				await this.log(existing.id, authorId, `Lead intake matched ${source}.`);
+				await this.addNote(existing.id, authorId, input.notes);
+			}
 			return { id: existing.id, created: false };
 		}
 
@@ -327,7 +332,11 @@ export class LeadsService {
 			return created;
 		});
 
-		await this.logAutomated(lead.id, userId, `Lead received from ${source}.`);
+		const authorId = await this.automatedAuthor(userId);
+		if (authorId) {
+			await this.log(lead.id, authorId, `Lead received from ${source}.`);
+			await this.addNote(lead.id, authorId, input.notes);
+		}
 		return { id: lead.id, created: true };
 	}
 
@@ -368,7 +377,7 @@ export class LeadsService {
 						data.position = await this.topOf(row.stage);
 					}
 					await this.db.lead.update({ where: { id: existing.id }, data });
-					await this.log(existing.id, userId, "Lead updated from Zoho CRM.");
+					await this.addNote(existing.id, userId, row.notes);
 					updated += 1;
 				} else {
 					const stage = row.stage ?? "NOT_CONTACTED";
@@ -400,6 +409,7 @@ export class LeadsService {
 						return imported;
 					});
 					await this.log(lead.id, userId, "Lead imported from Zoho CRM.");
+					await this.addNote(lead.id, userId, row.notes);
 					created += 1;
 				}
 			} catch (error) {
@@ -423,6 +433,7 @@ export class LeadsService {
 
 		if (!current) throw new NotFoundException("That lead no longer exists.");
 
+		const movedStage = rest.stage !== undefined && rest.stage !== current.stage;
 		const data: Prisma.LeadUpdateInput = {};
 
 		Object.assign(data, details(rest, true));
@@ -441,7 +452,7 @@ export class LeadsService {
 				? { connect: { id: rest.ownerId } }
 				: { disconnect: true };
 
-		if (rest.stage !== undefined && rest.stage !== current.stage) {
+		if (movedStage && rest.stage) {
 			data.stage = rest.stage;
 			data.stageChangedAt = new Date();
 			data.position = await this.topOf(rest.stage);
@@ -453,7 +464,10 @@ export class LeadsService {
 			select: cardSelect,
 		});
 
-		await this.log(id, userId, "Lead updated.");
+		if (movedStage && rest.stage) {
+			await this.log(id, userId, this.stageChange(current.stage, rest.stage));
+		}
+		await this.addNote(id, userId, rest.notes);
 
 		return lead;
 	}
@@ -512,7 +526,7 @@ export class LeadsService {
 			await this.log(
 				input.id,
 				userId,
-				`Stage changed ${current.stage} → ${input.stage}.`,
+				this.stageChange(current.stage, input.stage),
 			);
 		}
 
@@ -825,11 +839,15 @@ export class LeadsService {
 		this.logger.log({ message: "Respaced a lead column", stage });
 	}
 
+	private stageChange(from: LeadStage, to: LeadStage): string {
+		return `Stage changed ${LEADS.stageLabel[from]} → ${LEADS.stageLabel[to]}.`;
+	}
+
 	private async log(leadId: string, userId: string, body: string) {
 		await this.db.$transaction([
 			this.db.activity.create({
 				data: {
-					type: ActivityType.NOTE,
+					type: ActivityType.STAGE_CHANGE,
 					body,
 					leadId,
 					createdById: userId,
@@ -843,21 +861,42 @@ export class LeadsService {
 		]);
 	}
 
-	private async logAutomated(
+	private async addNote(
 		leadId: string,
-		userId: string | undefined,
-		body: string,
+		userId: string,
+		body: string | undefined,
 	) {
-		const authorId =
-			userId ??
-			(
-				await this.db.user.findFirst({
-					select: { id: true },
-					orderBy: { createdAt: "asc" },
-				})
-			)?.id;
-		if (!authorId) return;
-		await this.log(leadId, authorId, body);
+		const text = blank(body);
+		if (!text) return;
+		const now = new Date();
+		await this.db.$transaction([
+			this.db.activity.create({
+				data: {
+					type: ActivityType.NOTE,
+					subject: LEADS.note.subject,
+					body: text,
+					leadId,
+					createdById: userId,
+					occurredAt: now,
+					meta: LEADS.note.meta,
+				},
+			}),
+			this.db.lead.update({
+				where: { id: leadId },
+				data: { lastActivityAt: now },
+			}),
+		]);
+	}
+
+	private async automatedAuthor(
+		userId: string | undefined,
+	): Promise<string | undefined> {
+		if (userId) return userId;
+		const first = await this.db.user.findFirst({
+			select: { id: true },
+			orderBy: { createdAt: "asc" },
+		});
+		return first?.id;
 	}
 }
 
@@ -870,7 +909,6 @@ const DETAIL_KEYS = [
 	"state",
 	"address",
 	"nextAction",
-	"notes",
 	"servingEpcName",
 ] as const;
 

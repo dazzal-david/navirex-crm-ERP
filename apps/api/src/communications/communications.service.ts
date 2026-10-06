@@ -135,8 +135,76 @@ export class CommunicationsService {
 		};
 	}
 
-	async conversations() {
-		const leads = await this.db.lead.findMany({
+	async conversations(userId: string) {
+		const [leads, unread] = await Promise.all([
+			this.conversationLeads(),
+			this.unreadByLead(userId),
+		]);
+		return leads.map(({ activities, ...lead }) => ({
+			...lead,
+			preview: activities[0]?.body ?? activities[0]?.subject ?? null,
+			unread: unread.get(lead.id) ?? 0,
+		}));
+	}
+
+	async unread(userId: string) {
+		const unread = await this.unreadByLead(userId);
+		return { conversations: unread.size };
+	}
+
+	async markRead(leadId: string, userId: string) {
+		const readAt = new Date();
+		await this.db.leadConversationRead.upsert({
+			where: { userId_leadId: { userId, leadId } },
+			create: { userId, leadId, readAt },
+			update: { readAt },
+		});
+		return { readAt };
+	}
+
+	async notes(leadId: string) {
+		const notes = await this.db.activity.findMany({
+			where: { leadId, type: ActivityType.NOTE },
+			orderBy: [{ occurredAt: "desc" }, { createdAt: "desc" }],
+			take: WHATSAPP.noteLimit,
+			select: {
+				id: true,
+				body: true,
+				subject: true,
+				meta: true,
+				occurredAt: true,
+				createdAt: true,
+				createdBy: { select: { name: true } },
+			},
+		});
+		return notes
+			.filter((note) => communicationMeta(note.meta).channel !== "whatsapp")
+			.map((note) => ({
+				id: note.id,
+				body: note.body ?? note.subject ?? "",
+				authorName: note.createdBy.name,
+				occurredAt: note.occurredAt ?? note.createdAt,
+			}));
+	}
+
+	private async unreadByLead(userId: string) {
+		const rows = await this.db.$queryRaw<{ leadId: string; unread: bigint }[]>`
+			SELECT a."leadId", count(*) AS unread
+			FROM "activity" a
+			JOIN "lead" l ON l."id" = a."leadId" AND l."archivedAt" IS NULL
+			JOIN "user" u ON u."id" = ${userId}
+			LEFT JOIN "leadConversationRead" r
+				ON r."leadId" = a."leadId" AND r."userId" = ${userId}
+			WHERE a."meta"->>'channel' = 'whatsapp'
+				AND a."meta"->>'direction' = 'inbound'
+				AND COALESCE(a."occurredAt", a."createdAt") > COALESCE(r."readAt", u."createdAt")
+			GROUP BY a."leadId"
+		`;
+		return new Map(rows.map((row) => [row.leadId, Number(row.unread)]));
+	}
+
+	private conversationLeads() {
+		return this.db.lead.findMany({
 			where: { archivedAt: null },
 			select: {
 				id: true,
@@ -148,19 +216,15 @@ export class CommunicationsService {
 				source: true,
 				lastActivityAt: true,
 				activities: {
+					where: { type: { in: CONVERSATION_TYPES } },
 					select: { body: true, subject: true },
 					orderBy: [{ occurredAt: "desc" }, { createdAt: "desc" }],
 					take: 1,
 				},
 			},
 			orderBy: [{ lastActivityAt: "desc" }, { createdAt: "desc" }],
-			take: 250,
+			take: WHATSAPP.conversationLimit,
 		});
-
-		return leads.map(({ activities, ...lead }) => ({
-			...lead,
-			preview: activities[0]?.body ?? activities[0]?.subject ?? null,
-		}));
 	}
 
 	async conversation(leadId: string) {
@@ -182,7 +246,7 @@ export class CommunicationsService {
 
 		const [activities, emailMessages] = await Promise.all([
 			this.db.activity.findMany({
-				where: { leadId },
+				where: { leadId, type: { in: CONVERSATION_TYPES } },
 				select: {
 					id: true,
 					type: true,
@@ -928,6 +992,13 @@ export class CommunicationsService {
 		]);
 	}
 }
+
+const CONVERSATION_TYPES: ActivityType[] = [
+	ActivityType.NOTE,
+	ActivityType.EMAIL,
+	ActivityType.CALL,
+	ActivityType.MEETING,
+];
 
 function communicationMeta(value: Prisma.JsonValue | null) {
 	const parsed = communicationMetaValue.safeParse(value);

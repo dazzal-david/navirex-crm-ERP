@@ -10,6 +10,7 @@ import Partnership from "@carbon/icons-react/es/Partnership";
 import Plug from "@carbon/icons-react/es/Plug";
 import Settings from "@carbon/icons-react/es/Settings";
 import UserMultiple from "@carbon/icons-react/es/UserMultiple";
+import { Badge } from "@crm/ui/components/badge";
 import { Button } from "@crm/ui/components/button";
 import type { CarbonIcon } from "@crm/ui/components/icon";
 import { Icon } from "@crm/ui/components/icon";
@@ -28,6 +29,7 @@ import { useMemo } from "react";
 import { AgentBuilderSidebar } from "@/components/agent-builder/agent-builder-sidebar";
 import { usePrefetchSection } from "@/components/crm/section-prefetch";
 import { useMobileNav } from "@/components/mobile-nav";
+import { WHATSAPP_UI } from "@/lib/communications/whatsapp-config";
 import { useTRPC } from "@/lib/trpc/client";
 import { useHydrated } from "@/lib/use-hydrated";
 import { useWorkspaceUrl } from "@/lib/use-workspace-url";
@@ -41,6 +43,7 @@ type RailItem = {
 	related?: string[];
 	group: "primary" | "utility";
 	requiresPeopleManager?: boolean;
+	showsUnread?: boolean;
 };
 
 const ITEMS: RailItem[] = [
@@ -64,6 +67,7 @@ const ITEMS: RailItem[] = [
 		icon: Chat,
 		match: "prefix",
 		group: "primary",
+		showsUnread: true,
 	},
 	{
 		title: "Contacts",
@@ -127,13 +131,30 @@ function isActive(item: RailItem, pathname: string): boolean {
 	);
 }
 
+function UnreadBadge({ count }: { count: number }) {
+	if (count <= 0) return null;
+	const label =
+		count > WHATSAPP_UI.unreadBadgeMax
+			? `${WHATSAPP_UI.unreadBadgeMax}+`
+			: String(count);
+	return (
+		<span className="ml-auto">
+			<Badge aria-label={`${count} unread WhatsApp conversations`}>
+				{label}
+			</Badge>
+		</span>
+	);
+}
+
 function RailLink({
 	item,
 	active,
+	unread,
 	onPrefetch,
 }: {
 	item: RailItem;
 	active: boolean;
+	unread: number;
 	onPrefetch: () => void;
 }) {
 	return (
@@ -152,6 +173,7 @@ function RailLink({
 			>
 				<Icon icon={item.icon} className={item.iconClassName} />
 				<span className="truncate">{item.title}</span>
+				{item.showsUnread ? <UnreadBadge count={unread} /> : null}
 			</Link>
 		</Button>
 	);
@@ -160,11 +182,13 @@ function RailLink({
 function MobileRailLink({
 	item,
 	active,
+	unread,
 	onNavigate,
 	onPrefetch,
 }: {
 	item: RailItem;
 	active: boolean;
+	unread: number;
 	onNavigate: () => void;
 	onPrefetch: () => void;
 }) {
@@ -187,6 +211,7 @@ function MobileRailLink({
 			>
 				<Icon icon={item.icon} className={item.iconClassName} />
 				<span>{item.title}</span>
+				{item.showsUnread ? <UnreadBadge count={unread} /> : null}
 			</Link>
 		</Button>
 	);
@@ -260,6 +285,12 @@ export function AppIconRailFallback() {
 export function AppIconRail() {
 	const trpc = useTRPC();
 	const workspace = useQuery(trpc.workspace.get.queryOptions());
+	const unread = useQuery({
+		...trpc.communications.unread.queryOptions(),
+		refetchInterval: WHATSAPP_UI.unreadPollMs,
+		refetchIntervalInBackground: false,
+	});
+	const unreadCount = unread.data?.conversations ?? 0;
 	const hydrated = useHydrated();
 	const pathname = usePathname();
 	const workspaceUrl = useWorkspaceUrl();
@@ -297,6 +328,7 @@ export function AppIconRail() {
 						key={item.href}
 						item={item}
 						active={isActive(item, pathname)}
+						unread={unreadCount}
 						onPrefetch={() => prefetchSection(item.section)}
 					/>
 				))}
@@ -306,6 +338,7 @@ export function AppIconRail() {
 							key={item.href}
 							item={item}
 							active={isActive(item, pathname)}
+							unread={unreadCount}
 							onPrefetch={() => prefetchSection(item.section)}
 						/>
 					))}
@@ -367,6 +400,7 @@ export function AppIconRail() {
 									key={item.href}
 									item={item}
 									active={isActive(item, pathname)}
+									unread={unreadCount}
 									onNavigate={() => setOpen(false)}
 									onPrefetch={() => prefetchSection(item.section)}
 								/>

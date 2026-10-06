@@ -82,14 +82,13 @@ const STAGE_CARD_STYLE = [
 	"border-amber-200/70 bg-amber-50/60 dark:border-amber-900/60 dark:bg-amber-950/20",
 	"border-sky-200/70 bg-sky-50/60 dark:border-sky-900/60 dark:bg-sky-950/20",
 	"border-violet-200/70 bg-violet-50/60 dark:border-violet-900/60 dark:bg-violet-950/20",
-	"border-emerald-200/70 bg-emerald-50/60 dark:border-emerald-900/60 dark:bg-emerald-950/20",
-	"border-rose-200/70 bg-rose-50/60 dark:border-rose-900/60 dark:bg-rose-950/20",
 	"border-green-200/70 bg-green-50/60 dark:border-green-900/60 dark:bg-green-950/20",
+	"border-rose-200/70 bg-rose-50/60 dark:border-rose-900/60 dark:bg-rose-950/20",
+	"border-zinc-200/70 bg-zinc-50/60 dark:border-zinc-800/60 dark:bg-zinc-900/20",
 ] as const;
 const STAGE_TONE = {
 	NOT_CONTACTED: "warning",
 	CONTACTED: "info",
-	INTERESTED: "primary",
 	FOLLOW_UP: "neutral",
 	ONBOARDED: "success",
 	NOT_INTERESTED: "error",

@@ -11,7 +11,6 @@ import { useTRPC } from "@/lib/trpc/client";
 const STAGES = new Set([
 	"NOT_CONTACTED",
 	"CONTACTED",
-	"INTERESTED",
 	"FOLLOW_UP",
 	"ONBOARDED",
 	"NOT_INTERESTED",
@@ -20,7 +19,6 @@ const STAGES = new Set([
 type Stage =
 	| "NOT_CONTACTED"
 	| "CONTACTED"
-	| "INTERESTED"
 	| "FOLLOW_UP"
 	| "ONBOARDED"
 	| "NOT_INTERESTED"
@@ -175,8 +173,8 @@ function stageOf(value: string): Stage | undefined {
 		return "NOT_INTERESTED";
 	if (/convert|won|approve|onboard/.test(normalize(value))) return "ONBOARDED";
 	if (/follow|future/.test(normalize(value))) return "FOLLOW_UP";
-	if (/qualif|interest|hot/.test(normalize(value))) return "INTERESTED";
-	if (/contact|talk|attempt/.test(normalize(value))) return "CONTACTED";
+	if (/contact|talk|attempt|qualif|interest|hot/.test(normalize(value)))
+		return "CONTACTED";
 	return undefined;
 }
 

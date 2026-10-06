@@ -18,9 +18,12 @@ import {
 	conversationInput,
 	conversationOutput,
 	conversationsOutput,
+	leadNotesOutput,
+	markReadOutput,
 	sendEmailInput,
 	sendMessageOutput,
 	sendWhatsAppInput,
+	unreadOutput,
 	whatsappWindowOutput,
 } from "./communications.contracts";
 import { CommunicationsService } from "./communications.service";
@@ -42,8 +45,26 @@ export class CommunicationsRouter {
 	}
 
 	@Query({ output: conversationsOutput })
-	conversations() {
-		return this.communications.conversations();
+	conversations(@Ctx() ctx: AuthedTrpcContext) {
+		return this.communications.conversations(ctx.user.id);
+	}
+
+	@Query({ output: unreadOutput })
+	unread(@Ctx() ctx: AuthedTrpcContext) {
+		return this.communications.unread(ctx.user.id);
+	}
+
+	@Mutation({ input: conversationInput, output: markReadOutput })
+	markRead(
+		@Input() input: z.infer<typeof conversationInput>,
+		@Ctx() ctx: AuthedTrpcContext,
+	) {
+		return this.communications.markRead(input.leadId, ctx.user.id);
+	}
+
+	@Query({ input: conversationInput, output: leadNotesOutput })
+	notes(@Input() input: z.infer<typeof conversationInput>) {
+		return this.communications.notes(input.leadId);
 	}
 
 	@Query({ input: conversationInput, output: conversationOutput })
