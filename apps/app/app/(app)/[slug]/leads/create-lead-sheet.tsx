@@ -26,6 +26,7 @@ import { Textarea } from "@crm/ui/components/textarea";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { toast } from "sonner";
+import { PhoneInput } from "@/components/crm/phone-input";
 import { LEAD_BOARD } from "@/lib/leads/board-config";
 import { useTRPC } from "@/lib/trpc/client";
 
@@ -257,12 +258,11 @@ export function CreateLeadSheet() {
 
 							<Field>
 								<FieldLabel htmlFor="lead-phone">Mobile number *</FieldLabel>
-								<Input
+								<PhoneInput
 									id="lead-phone"
+									label="Mobile number"
 									name="phone"
-									placeholder="+91 …"
 									required
-									type="tel"
 								/>
 							</Field>
 
@@ -270,10 +270,10 @@ export function CreateLeadSheet() {
 								<FieldLabel htmlFor="lead-secondary-phone">
 									Secondary phone
 								</FieldLabel>
-								<Input
+								<PhoneInput
 									id="lead-secondary-phone"
+									label="Secondary phone"
 									name="secondaryPhone"
-									type="tel"
 								/>
 							</Field>
 

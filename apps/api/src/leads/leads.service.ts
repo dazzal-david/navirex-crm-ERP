@@ -1,4 +1,11 @@
-import { ActivityType, type Db, type LeadStage, type Prisma } from "@crm/db";
+import {
+	ActivityType,
+	type Db,
+	type LeadStage,
+	type NavirexEntity,
+	type Prisma,
+} from "@crm/db";
+import { PHONE, withCountryCode } from "@crm/validation/phone";
 import {
 	BadRequestException,
 	Injectable,
@@ -238,10 +245,10 @@ export class LeadsService {
 		const lead = await this.agent.withCrmEvents(async (tx, emit) => {
 			const created = await tx.lead.create({
 				data: {
-					...details(input),
+					...details(input, false, input.entity),
 					name: input.name,
 					email: blank(input.email),
-					phone: blank(input.phone),
+					phone: leadPhone(input.phone, input.entity),
 					kind: input.kind,
 					entity: input.entity ?? null,
 					stage,
@@ -277,7 +284,7 @@ export class LeadsService {
 	): Promise<{ id: string; created: boolean }> {
 		const source = blank(input.source) ?? "API";
 		const email = blank(input.email)?.toLowerCase() ?? null;
-		const phone = blank(input.phone);
+		const phone = leadPhone(input.phone, input.entity);
 		const externalId = blank(input.externalId);
 
 		const existing = await this.db.lead.findFirst({
@@ -308,7 +315,7 @@ export class LeadsService {
 		const lead = await this.agent.withCrmEvents(async (tx, emit) => {
 			const created = await tx.lead.create({
 				data: {
-					...details(input),
+					...details(input, false, input.entity),
 					name: input.name,
 					email,
 					phone,
@@ -364,9 +371,10 @@ export class LeadsService {
 						name: row.name,
 						zohoId: row.zohoId,
 					};
-					Object.assign(data, details(row, true));
+					Object.assign(data, details(row, true, row.entity));
 					if (row.email !== undefined) data.email = email;
-					if (row.phone !== undefined) data.phone = blank(row.phone);
+					if (row.phone !== undefined)
+						data.phone = leadPhone(row.phone, row.entity);
 					if (row.kind !== undefined) data.kind = row.kind;
 					if (row.entity !== undefined) data.entity = row.entity;
 					if (row.ownerId !== undefined) data.ownerId = row.ownerId;
@@ -386,10 +394,10 @@ export class LeadsService {
 					const lead = await this.agent.withCrmEvents(async (tx, emit) => {
 						const imported = await tx.lead.create({
 							data: {
-								...details(row),
+								...details(row, false, row.entity),
 								name: row.name,
 								email,
-								phone: blank(row.phone),
+								phone: leadPhone(row.phone, row.entity),
 								kind: row.kind ?? "EPC",
 								entity: row.entity ?? null,
 								stage,
@@ -428,18 +436,19 @@ export class LeadsService {
 
 		const current = await this.db.lead.findUnique({
 			where: { id },
-			select: { id: true, stage: true },
+			select: { id: true, stage: true, entity: true },
 		});
 
 		if (!current) throw new NotFoundException("That lead no longer exists.");
 
+		const entity = rest.entity ?? current.entity;
 		const movedStage = rest.stage !== undefined && rest.stage !== current.stage;
 		const data: Prisma.LeadUpdateInput = {};
 
-		Object.assign(data, details(rest, true));
+		Object.assign(data, details(rest, true, entity));
 		if (rest.name !== undefined) data.name = rest.name;
 		if (rest.email !== undefined) data.email = blank(rest.email);
-		if (rest.phone !== undefined) data.phone = blank(rest.phone);
+		if (rest.phone !== undefined) data.phone = leadPhone(rest.phone, entity);
 		if (rest.kind !== undefined) data.kind = rest.kind;
 		if (rest.entity !== undefined) data.entity = rest.entity ?? null;
 		if (rest.source !== undefined) data.source = blank(rest.source);
@@ -916,15 +925,35 @@ type LeadDetails = Partial<
 	Record<(typeof DETAIL_KEYS)[number] | "secondaryEmail", string>
 >;
 
-function details(input: LeadDetails, onlyGiven = false) {
+function details(
+	input: LeadDetails,
+	onlyGiven: boolean,
+	entity: NavirexEntity | null | undefined,
+) {
 	const data: Partial<Record<keyof LeadDetails, string | null>> = {};
 	for (const key of [...DETAIL_KEYS, "secondaryEmail"] as const) {
 		if (onlyGiven && input[key] === undefined) continue;
 		const value = blank(input[key]);
 		data[key] =
-			key === "secondaryEmail" ? (value?.toLowerCase() ?? null) : value;
+			key === "secondaryEmail"
+				? (value?.toLowerCase() ?? null)
+				: key === "secondaryPhone"
+					? leadPhone(value ?? undefined, entity)
+					: value;
 	}
 	return data;
+}
+
+function leadPhone(
+	value: string | undefined,
+	entity: NavirexEntity | null | undefined,
+): string | null {
+	const phone = blank(value);
+	if (!phone) return null;
+	return withCountryCode(
+		phone,
+		entity === "GERMANY" ? PHONE.germanyDial : PHONE.defaultDial,
+	);
 }
 
 function blank(value: string | undefined): string | null {

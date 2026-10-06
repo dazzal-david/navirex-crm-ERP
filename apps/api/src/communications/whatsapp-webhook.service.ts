@@ -1,5 +1,6 @@
 import { ActivityType, type Db, type Prisma } from "@crm/db";
 import { SETTINGS_ID } from "@crm/db/settings";
+import { samePhone } from "@crm/validation/phone";
 import { BadRequestException, Injectable, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { z } from "zod";
@@ -175,9 +176,10 @@ export class WhatsAppWebhookService {
 			where: { archivedAt: null, phone: { not: null } },
 			select: { id: true, ownerId: true, phone: true },
 		});
-		let lead = candidates.find(
-			(candidate) => normalizePhone(candidate.phone ?? "") === phone,
-		);
+		let lead =
+			candidates.find(
+				(candidate) => normalizePhone(candidate.phone ?? "") === phone,
+			) ?? candidates.find((candidate) => samePhone(candidate.phone, phone));
 		if (!lead) {
 			const result = await this.leads.intake({
 				name: fromName?.trim() || `WhatsApp ${phone.slice(-4)}`,

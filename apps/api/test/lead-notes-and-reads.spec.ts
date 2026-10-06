@@ -109,7 +109,7 @@ describe("partial updates", () => {
 
 		expect(updated.stage).toBe("FOLLOW_UP");
 		expect(updated.kind).toBe("CUSTOMER");
-		expect(updated.phone).toBe("+91 98 7654");
+		expect(updated.phone).toBe("+91987654");
 	});
 });
 
@@ -330,5 +330,85 @@ describe("WhatsApp messages sent from the phone app", () => {
 		expect(
 			conversation.items.map((item) => [item.direction, item.body]),
 		).toEqual([["outbound", "Sent from the phone"]]);
+	});
+});
+
+describe("lead phone numbers", () => {
+	it("adds +91 to a bare Indian number on create and on edit", async () => {
+		const lead = await leads.create(
+			{
+				name: `Neeraj ${suffix}`,
+				kind: "OTHER",
+				stage: "NOT_CONTACTED",
+				phone: "9946788886",
+				secondaryPhone: "09946788887",
+			},
+			userId,
+		);
+		expect(lead.phone).toBe("+919946788886");
+
+		const edited = await leads.update(
+			{ id: lead.id, phone: "99467 88880" },
+			userId,
+		);
+		const stored = await db.lead.findUniqueOrThrow({
+			where: { id: lead.id },
+			select: { secondaryPhone: true },
+		});
+
+		expect(edited.phone).toBe("+919946788880");
+		expect(stored.secondaryPhone).toBe("+919946788887");
+	});
+
+	it("uses +49 for a German lead", async () => {
+		const lead = await leads.create(
+			{
+				name: `German ${suffix}`,
+				kind: "OTHER",
+				stage: "NOT_CONTACTED",
+				entity: "GERMANY",
+				phone: "0151 23456789",
+			},
+			userId,
+		);
+
+		expect(lead.phone).toBe("+4915123456789");
+	});
+
+	it("files a reply on the lead stored without a country code", async () => {
+		const lead = await db.lead.create({
+			data: { name: `Old number ${suffix}`, phone: "9000000777" },
+			select: { id: true },
+		});
+
+		await webhook.receive({
+			object: "whatsapp_business_account",
+			entry: [
+				{
+					changes: [
+						{
+							field: "messages",
+							value: {
+								messages: [
+									{
+										from: "919000000777",
+										id: `wamid.reply.${suffix}`,
+										timestamp: String(Math.floor(Date.now() / 1000)),
+										type: "text",
+										text: { body: "Yes, call me" },
+									},
+								],
+							},
+						},
+					],
+				},
+			],
+		});
+
+		const reply = await db.activity.findUniqueOrThrow({
+			where: { id: `whatsapp:wamid.reply.${suffix}` },
+			select: { leadId: true },
+		});
+		expect(reply.leadId).toBe(lead.id);
 	});
 });
