@@ -36,7 +36,10 @@ export function AddConnectionDialog({
 				if (!next) router.replace(`/${slug}/settings/connections`);
 			}}
 		>
-			<DialogContent className="max-w-(--container-narrow) gap-0 p-0 md:left-[calc(50%+calc((var(--width-app-navigation)+213px)/2))]">
+			<DialogContent
+				bodyClassName="gap-0 p-0"
+				className="max-w-(--container-narrow) md:left-[calc(50%+calc((var(--width-app-navigation)+213px)/2))]"
+			>
 				<DialogHeader className="gap-2 px-(--spacing-block-inline) pt-5 pb-4">
 					<DialogTitle className="text-base">Add a connection</DialogTitle>
 					<DialogDescription>

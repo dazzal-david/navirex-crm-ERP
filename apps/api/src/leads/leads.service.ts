@@ -28,7 +28,7 @@ import {
 	type LeadUpdateInput,
 	type ZohoLeadRow,
 } from "./leads.contracts";
-import { LEADS } from "./leads-config";
+import { LEADS, unassignedLeadWhere } from "./leads-config";
 
 const cardSelect = {
 	id: true,
@@ -186,6 +186,62 @@ export class LeadsService {
 			total,
 			nextCursor: hasMore ? (leads.at(-1)?.id ?? null) : null,
 		};
+	}
+
+	async unassigned(cursor?: string) {
+		const where = unassignedLeadWhere();
+		const pageSize = LEADS.unassigned.pageSize;
+		const [total, rows] = await Promise.all([
+			this.db.lead.count({ where }),
+			this.db.lead.findMany({
+				where,
+				select: cardSelect,
+				orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+				take: pageSize + 1,
+				cursor: cursor ? { id: cursor } : undefined,
+				skip: cursor ? 1 : undefined,
+			}),
+		]);
+		const hasMore = rows.length > pageSize;
+		const leads = hasMore ? rows.slice(0, pageSize) : rows;
+		return {
+			leads,
+			total,
+			nextCursor: hasMore ? (leads.at(-1)?.id ?? null) : null,
+		};
+	}
+
+	async assignMany(ids: string[], ownerId: string, userId: string) {
+		const owner = await this.db.user.findUnique({
+			where: { id: ownerId },
+			select: { id: true, name: true },
+		});
+		if (!owner)
+			throw new NotFoundException("That team member no longer exists.");
+
+		const targets = await this.db.lead.findMany({
+			where: { id: { in: ids }, archivedAt: null },
+			select: { id: true },
+		});
+		if (targets.length === 0) return { assigned: 0 };
+
+		const now = new Date();
+		await this.db.$transaction([
+			this.db.lead.updateMany({
+				where: { id: { in: targets.map((lead) => lead.id) } },
+				data: { ownerId, lastActivityAt: now },
+			}),
+			this.db.activity.createMany({
+				data: targets.map((lead) => ({
+					type: ActivityType.STAGE_CHANGE,
+					body: `Lead assigned to ${owner.name}.`,
+					leadId: lead.id,
+					createdById: userId,
+					occurredAt: now,
+				})),
+			}),
+		]);
+		return { assigned: targets.length };
 	}
 
 	async byId(id: string) {

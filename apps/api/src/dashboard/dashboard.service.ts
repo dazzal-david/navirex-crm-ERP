@@ -11,6 +11,7 @@ import { Injectable } from "@nestjs/common";
 import { toCents } from "../crm/values";
 import { ConversionService } from "../currency/conversion.service";
 import { InjectDatabase } from "../database/database.constants";
+import { LEADS, unassignedLeadWhere } from "../leads/leads-config";
 import type { DashboardSummaryInput } from "./dashboard.contracts";
 import { DASHBOARD } from "./dashboard-config";
 
@@ -28,11 +29,7 @@ const DAY_LABEL = new Intl.DateTimeFormat("en-US", {
 	timeZone: "UTC",
 });
 
-const ACTIVE_LEAD_STAGES = [
-	LeadStage.NOT_CONTACTED,
-	LeadStage.CONTACTED,
-	LeadStage.FOLLOW_UP,
-] as const;
+const ACTIVE_LEAD_STAGES = LEADS.activeStages;
 const ACTIVE_LEAD_STAGE_SET = new Set<LeadStage>(ACTIVE_LEAD_STAGES);
 
 const LEAD_STAGES = Object.values(LeadStage);
@@ -373,13 +370,7 @@ export class DashboardService {
 					createdAt: { gte: previousWeekStart, lt: thisWeekStart },
 				},
 			}),
-			this.db.lead.count({
-				where: {
-					...leadWhere,
-					ownerId: null,
-					stage: { in: [...ACTIVE_LEAD_STAGES] },
-				},
-			}),
+			this.db.lead.count({ where: unassignedLeadWhere() }),
 			this.db.lead.count({ where: needsAttentionWhere }),
 			this.db.lead.findMany({
 				where: needsAttentionWhere,

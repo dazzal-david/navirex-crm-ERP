@@ -44,6 +44,7 @@ import { SEARCH_PARAM } from "@/lib/search-param-keys";
 import { useTRPC } from "@/lib/trpc/client";
 import { useWorkspaceUrl } from "@/lib/use-workspace-url";
 import { overviewParsers } from "./overview-search-params";
+import { UnassignedLeadsCard } from "./unassigned-leads-dialog";
 
 const CELL = "px-3 py-2.5 align-middle";
 const LEAD_COLUMNS: SimpleTableColumn[] = [
@@ -145,11 +146,9 @@ export function DashboardSummary() {
 					value={summary.totals.needsAttention}
 					description="Active leads without activity for seven days"
 				/>
-				<StatCard
+				<UnassignedLeadsCard
 					className={`rounded-2xl border shadow-sm ${SUMMARY_CARD_STYLE[3]}`}
-					label="Unassigned"
-					value={summary.totals.unassigned}
-					description="New leads waiting for an owner"
+					count={summary.totals.unassigned}
 				/>
 			</div>
 

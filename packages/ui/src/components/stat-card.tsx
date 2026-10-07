@@ -55,26 +55,23 @@ function StatDeltaText({
 	);
 }
 
-function StatCard({
-	label,
-	value,
-	delta,
-	description,
-	className,
-	children,
-	...props
-}: Omit<React.ComponentProps<"div">, "title"> & {
+type StatCardBody = {
 	label?: React.ReactNode;
 	value: React.ReactNode;
 	delta?: StatDelta;
 	description?: React.ReactNode;
-}) {
+	children?: React.ReactNode;
+};
+
+function StatCardContent({
+	label,
+	value,
+	delta,
+	description,
+	children,
+}: StatCardBody) {
 	return (
-		<div
-			data-slot="stat-card"
-			className={cn("flex flex-col gap-2.5 p-4 md:p-6", className)}
-			{...props}
-		>
+		<>
 			{label != null ? (
 				<span className="truncate text-sm font-medium text-muted-foreground">
 					{label}
@@ -92,9 +89,67 @@ function StatCard({
 				</p>
 			) : null}
 			{children}
+		</>
+	);
+}
+
+function StatCard({
+	label,
+	value,
+	delta,
+	description,
+	className,
+	children,
+	...props
+}: Omit<React.ComponentProps<"div">, "title"> & StatCardBody) {
+	return (
+		<div
+			data-slot="stat-card"
+			className={cn("flex flex-col gap-2.5 p-4 md:p-6", className)}
+			{...props}
+		>
+			<StatCardContent
+				delta={delta}
+				description={description}
+				label={label}
+				value={value}
+			>
+				{children}
+			</StatCardContent>
 		</div>
 	);
 }
 
+function StatCardButton({
+	label,
+	value,
+	delta,
+	description,
+	className,
+	children,
+	...props
+}: Omit<React.ComponentProps<"button">, "title" | "value"> & StatCardBody) {
+	return (
+		<button
+			data-slot="stat-card"
+			type="button"
+			className={cn(
+				"flex cursor-pointer flex-col gap-2.5 p-4 text-left outline-none transition-colors hover:bg-muted/40 focus-visible:ring-[3px] focus-visible:ring-ring/50 md:p-6",
+				className,
+			)}
+			{...props}
+		>
+			<StatCardContent
+				delta={delta}
+				description={description}
+				label={label}
+				value={value}
+			>
+				{children}
+			</StatCardContent>
+		</button>
+	);
+}
+
 export type { StatDelta, TrendDirection };
-export { StatCard, StatDeltaText };
+export { StatCard, StatCardButton, StatDeltaText };

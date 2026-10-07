@@ -412,3 +412,95 @@ describe("lead phone numbers", () => {
 		expect(reply.leadId).toBe(lead.id);
 	});
 });
+
+describe("unassigned leads", () => {
+	it("lists exactly the leads the dashboard counts", async () => {
+		const { DashboardService } = await import(
+			"../src/dashboard/dashboard.service"
+		);
+		const { ConversionService } = await import(
+			"../src/currency/conversion.service"
+		);
+		const dashboard = new DashboardService(db, new ConversionService(db));
+		await leads.create(
+			{ name: `Waiting ${suffix}`, kind: "EPC", stage: "NOT_CONTACTED" },
+			userId,
+		);
+		await leads.create(
+			{ name: `Closed ${suffix}`, kind: "EPC", stage: "NOT_INTERESTED" },
+			userId,
+		);
+
+		const list = await leads.unassigned();
+		const summary = await dashboard.leadOverview(userId, { scope: "everyone" });
+
+		expect(list.total).toBe(summary.totals.unassigned);
+		expect(list.leads.some((lead) => lead.name === `Waiting ${suffix}`)).toBe(
+			true,
+		);
+		expect(list.leads.some((lead) => lead.name === `Closed ${suffix}`)).toBe(
+			false,
+		);
+	});
+
+	it("assigns several leads to one owner and logs each", async () => {
+		const first = await leads.create(
+			{ name: `Bulk one ${suffix}`, kind: "EPC", stage: "NOT_CONTACTED" },
+			userId,
+		);
+		const second = await leads.create(
+			{ name: `Bulk two ${suffix}`, kind: "EPC", stage: "CONTACTED" },
+			userId,
+		);
+
+		const result = await leads.assignMany(
+			[first.id, second.id],
+			otherId,
+			userId,
+		);
+		const owners = await db.lead.findMany({
+			where: { id: { in: [first.id, second.id] } },
+			select: { ownerId: true, stage: true },
+		});
+		const logs = await db.activity.count({
+			where: {
+				leadId: { in: [first.id, second.id] },
+				body: "Lead assigned to Other Rep.",
+			},
+		});
+
+		expect(result.assigned).toBe(2);
+		expect(owners.every((lead) => lead.ownerId === otherId)).toBe(true);
+		expect(owners.map((lead) => lead.stage).sort()).toEqual([
+			"CONTACTED",
+			"NOT_CONTACTED",
+		]);
+		expect(logs).toBe(2);
+	});
+});
+
+describe("unassigned lead pages", () => {
+	it("pages through every unassigned lead with no gaps or repeats", async () => {
+		const { LEADS } = await import("../src/leads/leads-config");
+		const extra = LEADS.unassigned.pageSize + 3;
+		for (let index = 0; index < extra; index += 1) {
+			await db.lead.create({
+				data: { name: `Page ${index} ${suffix}`, stage: "NOT_CONTACTED" },
+			});
+		}
+
+		const seen: string[] = [];
+		let cursor: string | undefined;
+		let total = 0;
+		do {
+			const page = await leads.unassigned(cursor);
+			total = page.total;
+			seen.push(...page.leads.map((lead) => lead.id));
+			cursor = page.nextCursor ?? undefined;
+		} while (cursor);
+
+		expect(seen.length).toBe(total);
+		expect(new Set(seen).size).toBe(total);
+		expect(total).toBeGreaterThan(LEADS.unassigned.pageSize);
+	});
+});

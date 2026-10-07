@@ -169,7 +169,7 @@ function CommunicationDialog({
 				if (!open) onClose();
 			}}
 		>
-			<DialogContent>
+			<DialogContent size="lg">
 				<DialogHeader>
 					<DialogTitle>
 						{channel === "email" ? "Send email" : "Send WhatsApp message"}

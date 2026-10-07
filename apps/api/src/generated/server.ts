@@ -28,7 +28,7 @@ import { fieldListInput, fieldListOutput, fieldByKeyInput, serializedFieldOutput
 import { googleConnectionStatusOutput, setAutoCreateInput, suppressDomainInput, suppressDomainOutput, threadInput, emailThreadOutput, calendarEventInput, calendarEventOutput } from "../google/google.contracts";
 import { purgeSyncedDataOutput, revokeAccessOutput, microsoftConnectionStatusOutput, setOutlookAutoCreateInput } from "../microsoft/microsoft.contracts";
 import { invitationsOutput, inviteInput, inviteOutput, invitationIdInput, invitationOutput, removeMemberInput, removeMemberOutput } from "../invitations/invitations.contracts";
-import { boardInput, boardOutput, columnPageInput, columnPageOutput, leadListInput, leadListOutput, leadIdInput, leadDetailOutput, leadOwnersOutput, leadEpcOptionsOutput, leadCreateInput, leadMutateOutput, leadIntakeInput, leadIntakeOutput, zohoImportInput, zohoImportOutput, leadUpdateInput, leadMoveInput, leadAssignInput, leadConvertOutput, leadDeleteOutput } from "../leads/leads.contracts";
+import { boardInput, boardOutput, columnPageInput, columnPageOutput, leadListInput, leadListOutput, leadIdInput, leadDetailOutput, leadOwnersOutput, leadEpcOptionsOutput, unassignedLeadsInput, unassignedLeadsOutput, leadAssignManyInput, leadAssignManyOutput, leadCreateInput, leadMutateOutput, leadIntakeInput, leadIntakeOutput, zohoImportInput, zohoImportOutput, leadUpdateInput, leadMoveInput, leadAssignInput, leadConvertOutput, leadDeleteOutput } from "../leads/leads.contracts";
 import { metaStatusOutput, metaAvailablePagesOutput, metaPageInput, metaMutationOutput, metaSyncOutput } from "../meta/meta.contracts";
 import { employeePortalOutput, directoryOutput, updateMyProfileInput, employeeProfileOutput, updateEmployeeInput, reimbursementsOutput, submitReimbursementInput, reimbursementOutput, reviewReimbursementInput, reimbursementIdInput } from "../people/people.contracts";
 import { savedViewListInput, savedViewListOutput, savedViewCreateInput, savedViewOutput, savedViewUpdateArgs, savedViewIdInput, savedViewDeleteOutput } from "../saved-views/saved-views.contracts";
@@ -648,6 +648,14 @@ const appRouter = t.router({
     epcOptions: publicProcedure
       .output(leadEpcOptionsOutput)
       .query(async () => "PLACEHOLDER_DO_NOT_REMOVE" as any),
+    unassigned: publicProcedure
+      .input(unassignedLeadsInput)
+      .output(unassignedLeadsOutput)
+      .query(async () => "PLACEHOLDER_DO_NOT_REMOVE" as any),
+    assignMany: publicProcedure
+      .input(leadAssignManyInput)
+      .output(leadAssignManyOutput)
+      .mutation(async () => "PLACEHOLDER_DO_NOT_REMOVE" as any),
     create: publicProcedure
       .input(leadCreateInput)
       .output(leadMutateOutput)

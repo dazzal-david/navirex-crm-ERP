@@ -17,6 +17,8 @@ import {
 	columnPageInput,
 	columnPageOutput,
 	leadAssignInput,
+	leadAssignManyInput,
+	leadAssignManyOutput,
 	leadConvertOutput,
 	leadCreateInput,
 	leadDeleteOutput,
@@ -31,6 +33,8 @@ import {
 	leadMutateOutput,
 	leadOwnersOutput,
 	leadUpdateInput,
+	unassignedLeadsInput,
+	unassignedLeadsOutput,
 	zohoImportInput,
 	zohoImportOutput,
 } from "./leads.contracts";
@@ -100,6 +104,19 @@ export class LeadsRouter {
 	})
 	async epcOptions() {
 		return this.leads.epcOptions();
+	}
+
+	@Query({ input: unassignedLeadsInput, output: unassignedLeadsOutput })
+	async unassigned(@Input() input: z.infer<typeof unassignedLeadsInput>) {
+		return this.leads.unassigned(input.cursor);
+	}
+
+	@Mutation({ input: leadAssignManyInput, output: leadAssignManyOutput })
+	async assignMany(
+		@Input() input: z.infer<typeof leadAssignManyInput>,
+		@Ctx() ctx: AuthedTrpcContext,
+	) {
+		return this.leads.assignMany(input.ids, input.ownerId, ctx.user.id);
 	}
 
 	@Mutation({

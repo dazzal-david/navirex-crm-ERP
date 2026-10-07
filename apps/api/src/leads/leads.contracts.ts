@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { LEADS } from "./leads-config";
 
 export const LEAD_STAGES = [
 	"NOT_CONTACTED",
@@ -154,6 +155,23 @@ export const zohoImportOutput = z.object({
 export const leadUpdateInput = leadFields.partial().extend({ id: z.string() });
 
 export const leadIdInput = z.object({ id: z.string() });
+
+export const unassignedLeadsInput = z.object({
+	cursor: z.string().optional(),
+});
+
+export const unassignedLeadsOutput = z.object({
+	leads: z.array(leadCard),
+	total: z.number().int(),
+	nextCursor: z.string().nullable(),
+});
+
+export const leadAssignManyInput = z.object({
+	ids: z.array(z.string()).min(1).max(LEADS.unassigned.assignLimit),
+	ownerId: z.string(),
+});
+
+export const leadAssignManyOutput = z.object({ assigned: z.number().int() });
 
 export const leadMoveInput = z.object({
 	id: z.string(),

@@ -114,7 +114,8 @@ export function ShareChatDialog({
 			</DialogTrigger>
 			<DialogContent
 				showCloseButton={false}
-				className="w-[440px] max-w-[calc(100%-2rem)] gap-0 overflow-hidden p-0 sm:max-w-[440px]"
+				bodyClassName="gap-0 p-0"
+				className="w-[440px] max-w-[calc(100%-2rem)] sm:max-w-[440px]"
 			>
 				<DialogHeader className="relative gap-1 border-b p-5 pr-14">
 					<DialogTitle className="font-semibold text-sm">

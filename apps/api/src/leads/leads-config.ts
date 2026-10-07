@@ -1,7 +1,11 @@
-import type { LeadStage } from "@crm/db";
+import type { LeadStage, Prisma } from "@crm/db";
+
+const ACTIVE_STAGES: LeadStage[] = ["NOT_CONTACTED", "CONTACTED", "FOLLOW_UP"];
 
 export const LEADS = {
 	board: { columnLimit: 100 },
+	activeStages: ACTIVE_STAGES,
+	unassigned: { pageSize: 50, assignLimit: 1000 },
 	position: { gap: 1000 },
 	stageLabel: {
 		NOT_CONTACTED: "Not contacted",
@@ -16,3 +20,11 @@ export const LEADS = {
 		meta: { channel: "note", direction: "internal" },
 	},
 } as const;
+
+export function unassignedLeadWhere(): Prisma.LeadWhereInput {
+	return {
+		archivedAt: null,
+		ownerId: null,
+		stage: { in: LEADS.activeStages },
+	};
+}
