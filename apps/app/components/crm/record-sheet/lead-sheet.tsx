@@ -30,6 +30,8 @@ import { useCrmCache } from "@/lib/trpc/cache";
 import { useTRPC } from "@/lib/trpc/client";
 import type { RouterOutputs } from "@/lib/trpc/types";
 import { LeadCommunicationActions } from "./lead-communications";
+import { LeadContacts } from "./lead-contacts";
+import { MergeLeadButton, SameCompanyNotice } from "./lead-merge";
 import { LeadNotes } from "./lead-notes";
 import { RecordSheetFrame } from "./record-parts";
 import {
@@ -198,11 +200,7 @@ export function LeadSheet({ leadId }: { leadId: string }) {
 			actions={
 				lead ? (
 					<div className="flex flex-wrap gap-2">
-						<LeadCommunicationActions
-							leadId={lead.id}
-							email={lead.email}
-							phone={lead.phone}
-						/>
+						<LeadCommunicationActions leadId={lead.id} />
 						{lead.convertedAt && lead.companyId ? (
 							<Button
 								onClick={() =>
@@ -251,6 +249,7 @@ export function LeadSheet({ leadId }: { leadId: string }) {
 							)}
 							Archive
 						</Button>
+						<MergeLeadButton leadId={lead.id} leadName={lead.name} />
 					</div>
 				) : null
 			}
@@ -309,6 +308,7 @@ function LeadOverview({
 }) {
 	return (
 		<DetailSheetBody>
+			<SameCompanyNotice leadId={lead.id} leadName={lead.name} />
 			<DetailSheetSection className="py-5" title="Pipeline">
 				<div className="rounded-2xl border bg-muted/20 p-4">
 					<DetailSheetProperties>
@@ -367,7 +367,19 @@ function LeadOverview({
 				</div>
 			</DetailSheetSection>
 
-			<DetailSheetSection className="py-5" title="Contact details">
+			<DetailSheetSection className="py-5" title="People at this company">
+				<LeadContacts
+					leadId={lead.id}
+					main={{
+						name: lead.name,
+						designation: lead.designation,
+						phone: lead.phone,
+						email: lead.email,
+					}}
+				/>
+			</DetailSheetSection>
+
+			<DetailSheetSection className="py-5" title="Main contact details">
 				<div className="rounded-2xl border bg-card p-4 shadow-xs">
 					<DetailSheetProperties>
 						<InlineTextCell

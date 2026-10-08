@@ -93,6 +93,17 @@ export class LeadsService {
 				{ companyName: { contains: q, mode: "insensitive" } },
 				{ email: { contains: q, mode: "insensitive" } },
 				{ phone: { contains: q, mode: "insensitive" } },
+				{
+					contacts: {
+						some: {
+							OR: [
+								{ name: { contains: q, mode: "insensitive" } },
+								{ email: { contains: q, mode: "insensitive" } },
+								{ phone: { contains: q, mode: "insensitive" } },
+							],
+						},
+					},
+				},
 			];
 		}
 
@@ -166,6 +177,7 @@ export class LeadsService {
 
 	async list(input: LeadListInput, userId: string): Promise<LeadListOutput> {
 		const where = this.where(input, userId);
+		if (input.stage) where.stage = input.stage;
 		const pageSize = 50;
 		const [total, rows] = await Promise.all([
 			this.db.lead.count({ where }),
@@ -352,6 +364,29 @@ export class LeadsService {
 						? [{ email: { equals: email, mode: "insensitive" as const } }]
 						: []),
 					...(phone ? [{ phone }] : []),
+					...(email || phone
+						? [
+								{
+									contacts: {
+										some: {
+											OR: [
+												...(email
+													? [
+															{
+																email: {
+																	equals: email,
+																	mode: "insensitive" as const,
+																},
+															},
+														]
+													: []),
+												...(phone ? [{ phone }] : []),
+											],
+										},
+									},
+								},
+							]
+						: []),
 				],
 			},
 			select: { id: true },
@@ -759,6 +794,44 @@ export class LeadsService {
 				await tx.company.updateMany({
 					where: { id: companyId, primaryContactId: null },
 					data: { primaryContactId: contactId },
+				});
+			}
+
+			const extras = await tx.leadContact.findMany({
+				where: { leadId: lead.id },
+				select: { name: true, designation: true, phone: true, email: true },
+			});
+			for (const extra of extras) {
+				const extraEmail = extra.email?.toLowerCase() ?? null;
+				const known = extraEmail
+					? await tx.contact.findFirst({
+							where: {
+								archivedAt: null,
+								email: { equals: extraEmail, mode: "insensitive" },
+							},
+							select: { id: true, companyId: true },
+						})
+					: null;
+				if (known) {
+					if (!known.companyId) {
+						await tx.contact.update({
+							where: { id: known.id },
+							data: { companyId },
+						});
+					}
+					continue;
+				}
+				const [first, ...others] = extra.name.trim().split(/\s+/);
+				await tx.contact.create({
+					data: {
+						firstName: first || extra.name,
+						lastName: others.length > 0 ? others.join(" ") : null,
+						email: extraEmail,
+						phone: extra.phone,
+						title: extra.designation,
+						companyId,
+						ownerId: lead.ownerId,
+					},
 				});
 			}
 

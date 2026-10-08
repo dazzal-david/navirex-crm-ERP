@@ -38,9 +38,12 @@ const STAGE_STYLE = {
 export function LeadList() {
 	const trpc = useTRPC();
 	const openRecord = useOpenRecord();
-	const { filters: urlFilters } = useLeadFilters();
+	const { filters: urlFilters, values } = useLeadFilters();
 	const deferredQuery = useDeferredValue(urlFilters.q);
-	const filters = { ...urlFilters };
+	const filters: typeof urlFilters & {
+		stage?: (typeof LEAD_BOARD.stages)[number];
+	} = { ...urlFilters };
+	if (values.status) filters.stage = values.status;
 	if (deferredQuery) filters.q = deferredQuery;
 	else delete filters.q;
 
@@ -71,7 +74,9 @@ export function LeadList() {
 	return (
 		<div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border bg-card shadow-sm">
 			<div className="flex shrink-0 items-center justify-between border-b bg-muted/30 px-5 py-3">
-				<p className="font-medium text-sm">All leads</p>
+				<p className="font-medium text-sm">
+					{values.status ? LEAD_BOARD.label[values.status] : "All leads"}
+				</p>
 				<p className="text-muted-foreground text-xs tabular-nums">
 					{total} records
 				</p>

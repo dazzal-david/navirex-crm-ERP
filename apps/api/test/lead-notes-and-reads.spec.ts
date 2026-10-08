@@ -504,3 +504,24 @@ describe("unassigned lead pages", () => {
 		expect(total).toBeGreaterThan(LEADS.unassigned.pageSize);
 	});
 });
+
+describe("lead list status filter", () => {
+	it("returns only leads in the chosen status, and the board ignores it", async () => {
+		await leads.create(
+			{ name: `Status follow ${suffix}`, kind: "EPC", stage: "FOLLOW_UP" },
+			userId,
+		);
+		await leads.create(
+			{ name: `Status new ${suffix}`, kind: "EPC", stage: "NOT_CONTACTED" },
+			userId,
+		);
+
+		const list = await leads.list({ q: `Status`, stage: "FOLLOW_UP" }, userId);
+
+		expect(list.leads.every((lead) => lead.stage === "FOLLOW_UP")).toBe(true);
+		expect(
+			list.leads.some((lead) => lead.name === `Status follow ${suffix}`),
+		).toBe(true);
+		expect(list.total).toBe(list.leads.length);
+	});
+});

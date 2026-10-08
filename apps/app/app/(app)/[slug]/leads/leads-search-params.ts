@@ -12,6 +12,7 @@ export const leadFilterParsers = {
 	kind: parseAsStringLiteral(LEAD_BOARD.kinds),
 	owner: parseAsString.withDefault(""),
 	mine: parseAsBoolean.withDefault(false),
+	status: parseAsStringLiteral(LEAD_BOARD.stages),
 };
 
 export type LeadFilters = {
@@ -28,6 +29,7 @@ type LeadFilterValues = {
 	kind: (typeof LEAD_BOARD.kinds)[number] | null;
 	owner: string;
 	mine: boolean;
+	status?: (typeof LEAD_BOARD.stages)[number] | null;
 };
 
 export const loadLeadSearchParams = createLoader(leadFilterParsers);

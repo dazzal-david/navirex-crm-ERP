@@ -1058,6 +1058,7 @@ model Lead {
   activities      Activity[]
   formSubmissions FormSubmission[]
   reads           LeadConversationRead[]
+  contacts        LeadContact[]
   createdAt       DateTime               @default(now())
   updatedAt       DateTime               @updatedAt
 
@@ -1073,6 +1074,24 @@ model Lead {
   @@index([lastActivityAt])
   @@index([archivedAt])
   @@map("lead")
+}
+
+model LeadContact {
+  id          String  @id @default(cuid())
+  leadId      String
+  lead        Lead    @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  name        String
+  designation String?
+  phone       String?
+  email       String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([leadId])
+  @@index([phone])
+  @@index([email])
+  @@map("leadContact")
 }
 
 model LeadConversationRead {

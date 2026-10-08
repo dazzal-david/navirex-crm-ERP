@@ -7,6 +7,7 @@ import {
 	parseScopes,
 } from "@crm/auth";
 import { ActivityType, type Db, type Prisma } from "@crm/db";
+import { samePhone } from "@crm/validation/phone";
 import {
 	buildTemplateComponents,
 	templateHeaderMedia,
@@ -41,6 +42,8 @@ import {
 const communicationMetaValue = z.object({
 	channel: z.string().optional(),
 	direction: z.string().optional(),
+	from: z.string().optional(),
+	toName: z.string().nullable().optional(),
 	fromName: z.string().nullable().optional(),
 	mediaId: z.string().optional(),
 	mediaKind: z
@@ -80,6 +83,7 @@ type WhatsAppSendPayload = { messaging_product: "whatsapp"; to: string } & (
 
 type WhatsAppMediaUpload = {
 	leadId: string;
+	contactId?: string;
 	bytes: Buffer;
 	mimeType: string;
 	filename: string;
@@ -311,6 +315,7 @@ export class CommunicationsService {
 							: null,
 					deliveryStatus: meta.deliveryStatus ?? null,
 					deliveryError: meta.deliveryError ?? null,
+					recipientName: meta.toName ?? null,
 					fileNames: meta.attachmentNames
 						? meta.attachmentNames.split("\n")
 						: [],
@@ -330,6 +335,7 @@ export class CommunicationsService {
 				attachment: null,
 				deliveryStatus: null,
 				deliveryError: null,
+				recipientName: null,
 				fileNames: [],
 			})),
 		].sort(
@@ -341,11 +347,13 @@ export class CommunicationsService {
 			lead: leadOutput,
 			items,
 			whatsappWindow: await this.whatsappWindow(leadId),
+			recipients: await this.recipients(leadId),
 		};
 	}
 
-	async whatsappWindow(leadId: string) {
-		const last = await this.db.activity.findFirst({
+	async whatsappWindow(leadId: string, contactId?: string) {
+		const recipient = await this.recipient(leadId, contactId);
+		const inbound = await this.db.activity.findMany({
 			where: {
 				leadId,
 				AND: [
@@ -354,7 +362,14 @@ export class CommunicationsService {
 				],
 			},
 			orderBy: { occurredAt: { sort: "desc", nulls: "last" } },
-			select: { occurredAt: true, createdAt: true },
+			take: WHATSAPP.windowScanLimit,
+			select: { occurredAt: true, createdAt: true, meta: true },
+		});
+		const last = inbound.find((activity) => {
+			const from = communicationMeta(activity.meta).from;
+			return from
+				? samePhone(from, recipient.phone)
+				: recipient.contactId === null;
 		});
 		const lastInboundAt = last ? (last.occurredAt ?? last.createdAt) : null;
 		const closesAt = lastInboundAt
@@ -364,6 +379,65 @@ export class CommunicationsService {
 			open: closesAt !== null && closesAt.getTime() > Date.now(),
 			lastInboundAt,
 			closesAt,
+		};
+	}
+
+	async recipients(leadId: string) {
+		const lead = await this.db.lead.findUnique({
+			where: { id: leadId },
+			select: {
+				name: true,
+				designation: true,
+				phone: true,
+				email: true,
+				contacts: {
+					orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+					select: {
+						id: true,
+						name: true,
+						designation: true,
+						phone: true,
+						email: true,
+					},
+				},
+			},
+		});
+		if (!lead) throw new NotFoundException("That lead no longer exists.");
+		return [
+			{
+				id: null,
+				name: lead.name,
+				designation: lead.designation,
+				phone: lead.phone,
+				email: lead.email,
+				primary: true,
+			},
+			...lead.contacts.map((contact) => ({ ...contact, primary: false })),
+		];
+	}
+
+	private async recipient(leadId: string, contactId?: string) {
+		if (contactId) {
+			const contact = await this.db.leadContact.findFirst({
+				where: { id: contactId, leadId },
+				select: { id: true, name: true, phone: true, email: true },
+			});
+			if (!contact)
+				throw new NotFoundException("That contact no longer exists.");
+			return { leadId, contactId: contact.id, ...contact };
+		}
+		const lead = await this.db.lead.findUnique({
+			where: { id: leadId },
+			select: { id: true, name: true, phone: true, email: true },
+		});
+		if (!lead) throw new NotFoundException("That lead no longer exists.");
+		return {
+			leadId: lead.id,
+			contactId: null,
+			id: lead.id,
+			name: lead.name,
+			phone: lead.phone,
+			email: lead.email,
 		};
 	}
 
@@ -435,6 +509,7 @@ export class CommunicationsService {
 	async sendEmail(
 		input: {
 			leadId: string;
+			contactId?: string;
 			subject: string;
 			body: string;
 			attachments?: { name: string; mimeType: string; contentBase64: string }[];
@@ -442,11 +517,8 @@ export class CommunicationsService {
 		userId: string,
 	) {
 		const attachments = emailAttachments(input.attachments ?? []);
-		const lead = await this.db.lead.findUnique({
-			where: { id: input.leadId },
-			select: { id: true, email: true },
-		});
-		if (!lead) throw new NotFoundException("That lead no longer exists.");
+		const recipient = await this.recipient(input.leadId, input.contactId);
+		const lead = { id: recipient.leadId, email: recipient.email };
 		if (!lead.email)
 			throw new BadRequestException("Add an email address first.");
 
@@ -498,6 +570,8 @@ export class CommunicationsService {
 				messageId,
 				from: this.graphMail.sender,
 				to: lead.email,
+				toName: recipient.name,
+				contactId: recipient.contactId,
 				attachmentNames:
 					attachments.length > 0
 						? attachments.map((attachment) => attachment.name).join("\n")
@@ -544,6 +618,7 @@ export class CommunicationsService {
 	async sendWhatsApp(
 		input: {
 			leadId: string;
+			contactId?: string;
 			mode: "text" | "template";
 			body?: string;
 			templateName?: string;
@@ -554,8 +629,9 @@ export class CommunicationsService {
 		},
 		userId: string,
 	) {
-		const lead = await this.whatsappLead(input.leadId);
-		if (input.mode === "text") await this.requireOpenWindow(lead.id);
+		const lead = await this.whatsappLead(input.leadId, input.contactId);
+		if (input.mode === "text")
+			await this.requireOpenWindow(lead.id, lead.contactId);
 
 		const template: WhatsAppTemplate = {
 			name: input.templateName,
@@ -606,6 +682,8 @@ export class CommunicationsService {
 				provider: "meta",
 				messageId,
 				to: lead.phone,
+				toName: lead.name,
+				contactId: lead.contactId,
 				mode: input.mode,
 			},
 		);
@@ -658,8 +736,8 @@ export class CommunicationsService {
 	}
 
 	async sendWhatsAppMedia(input: WhatsAppMediaUpload, userId: string) {
-		const lead = await this.whatsappLead(input.leadId);
-		await this.requireOpenWindow(lead.id);
+		const lead = await this.whatsappLead(input.leadId, input.contactId);
+		await this.requireOpenWindow(lead.id, lead.contactId);
 		const upload = await this.uploadWhatsAppMedia(input);
 		const { kind, mimeType } = upload;
 
@@ -686,6 +764,8 @@ export class CommunicationsService {
 				provider: "meta",
 				messageId,
 				to: lead.phone,
+				toName: lead.name,
+				contactId: lead.contactId,
 				mode: "media",
 				mediaId: upload.id,
 				mediaKind: kind,
@@ -827,25 +907,26 @@ export class CommunicationsService {
 		}
 	}
 
-	private async whatsappLead(leadId: string) {
+	private async whatsappLead(leadId: string, contactId?: string) {
 		if (!this.whatsappToken || !this.whatsappPhoneId) {
 			throw new BadRequestException("WhatsApp Cloud API is not configured.");
 		}
-		const lead = await this.db.lead.findUnique({
-			where: { id: leadId },
-			select: { id: true, phone: true },
-		});
-		if (!lead) throw new NotFoundException("That lead no longer exists.");
-		const phone = normalizePhone(lead.phone);
+		const recipient = await this.recipient(leadId, contactId);
+		const phone = normalizePhone(recipient.phone);
 		if (!phone)
 			throw new BadRequestException(
 				"Add a valid international phone number first.",
 			);
-		return { id: lead.id, phone };
+		return {
+			id: recipient.leadId,
+			phone,
+			name: recipient.name,
+			contactId: recipient.contactId,
+		};
 	}
 
-	private async requireOpenWindow(leadId: string) {
-		const window = await this.whatsappWindow(leadId);
+	private async requireOpenWindow(leadId: string, contactId: string | null) {
+		const window = await this.whatsappWindow(leadId, contactId ?? undefined);
 		if (!window.open) throw new BadRequestException(WINDOW_CLOSED_MESSAGE);
 	}
 

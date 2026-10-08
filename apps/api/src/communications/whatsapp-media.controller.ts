@@ -72,6 +72,7 @@ export class WhatsAppMediaController {
 		@Param("leadId") leadId: string,
 		@Query("filename") filename: string | undefined,
 		@Query("caption") caption: string | undefined,
+		@Query("contactId") contactId: string | undefined,
 		@Headers("content-type") contentType: string | undefined,
 		@Req() request: IncomingMessage,
 		@Session() session: CrmSession,
@@ -85,6 +86,7 @@ export class WhatsAppMediaController {
 		return this.communications.sendWhatsAppMedia(
 			{
 				leadId,
+				contactId: contactId?.trim() || undefined,
 				bytes,
 				mimeType: contentType ?? "",
 				filename: filename?.trim() || "file",

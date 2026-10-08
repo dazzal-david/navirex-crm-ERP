@@ -17,6 +17,7 @@ export const emailAttachmentInput = z.object({
 
 export const sendEmailInput = z.object({
 	leadId: z.string(),
+	contactId: z.string().optional(),
 	subject: z.string().trim().min(1).max(300),
 	body: z.string().trim().min(1).max(50_000),
 	attachments: z.array(emailAttachmentInput).max(10).default([]),
@@ -25,6 +26,7 @@ export const sendEmailInput = z.object({
 export const sendWhatsAppInput = z
 	.object({
 		leadId: z.string(),
+		contactId: z.string().optional(),
 		mode: z.enum(["text", "template"]),
 		body: z.string().trim().max(4096).optional(),
 		templateName: z.string().trim().max(512).optional(),
@@ -56,6 +58,21 @@ export const sendMessageOutput = z.object({
 });
 
 export const conversationInput = z.object({ leadId: z.string() });
+
+export const whatsappWindowInput = conversationInput.extend({
+	contactId: z.string().optional(),
+});
+
+export const recipient = z.object({
+	id: z.string().nullable(),
+	name: z.string(),
+	designation: z.string().nullable(),
+	phone: z.string().nullable(),
+	email: z.string().nullable(),
+	primary: z.boolean(),
+});
+
+export const recipientsOutput = z.array(recipient);
 
 export const conversationSummary = z.object({
 	id: z.string(),
@@ -89,6 +106,7 @@ export const conversationItem = z.object({
 		.nullable(),
 	deliveryStatus: z.string().nullable(),
 	deliveryError: z.string().nullable(),
+	recipientName: z.string().nullable(),
 	fileNames: z.array(z.string()),
 });
 
@@ -104,6 +122,7 @@ export const conversationOutput = z.object({
 	lead: conversationSummary.omit({ preview: true, unread: true }),
 	items: z.array(conversationItem),
 	whatsappWindow: whatsappWindowOutput,
+	recipients: recipientsOutput,
 });
 
 export const addNoteInput = z.object({

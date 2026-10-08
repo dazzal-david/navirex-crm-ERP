@@ -39,19 +39,25 @@ import { WhatsAppTemplatePreview } from "@/components/crm/whatsapp/whatsapp-temp
 import { WhatsAppWindowAlert } from "@/components/crm/whatsapp/whatsapp-window-alert";
 import { WHATSAPP_UI } from "@/lib/communications/whatsapp-config";
 import { useTRPC } from "@/lib/trpc/client";
+import {
+	contactIdOf,
+	defaultRecipient,
+	type Recipient,
+	RecipientSelect,
+	reachable,
+} from "./recipient-select";
 
 type Channel = "email" | "whatsapp";
 
-export function LeadCommunicationActions({
-	leadId,
-	email,
-	phone,
-}: {
-	leadId: string;
-	email: string | null;
-	phone: string | null;
-}) {
+export function LeadCommunicationActions({ leadId }: { leadId: string }) {
+	const trpc = useTRPC();
 	const [channel, setChannel] = useState<Channel | null>(null);
+	const recipients = useQuery(
+		trpc.communications.recipients.queryOptions({ leadId }),
+	);
+	const people = recipients.data ?? [];
+	const email = people.some((person) => reachable(person, "email"));
+	const phone = people.some((person) => reachable(person, "whatsapp"));
 	return (
 		<>
 			<Button
@@ -72,11 +78,14 @@ export function LeadCommunicationActions({
 				<Icon data-icon="inline-start" icon={Chat} />
 				WhatsApp
 			</Button>
-			<CommunicationDialog
-				channel={channel}
-				leadId={leadId}
-				onClose={() => setChannel(null)}
-			/>
+			{channel ? (
+				<CommunicationDialog
+					channel={channel}
+					leadId={leadId}
+					onClose={() => setChannel(null)}
+					recipients={people}
+				/>
+			) : null}
 		</>
 	);
 }
@@ -85,12 +94,18 @@ function CommunicationDialog({
 	channel,
 	leadId,
 	onClose,
+	recipients,
 }: {
-	channel: Channel | null;
+	channel: Channel;
 	leadId: string;
 	onClose: () => void;
+	recipients: Recipient[];
 }) {
 	const trpc = useTRPC();
+	const [to, setTo] = useState<string | null>(() =>
+		defaultRecipient(recipients, channel),
+	);
+	const contactId = contactIdOf(to);
 	const queryClient = useQueryClient();
 	const [subject, setSubject] = useState("Following up from Navirex");
 	const [body, setBody] = useState("");
@@ -104,7 +119,7 @@ function CommunicationDialog({
 		enabled: channel !== null,
 	});
 	const windowState = useQuery({
-		...trpc.communications.whatsappWindow.queryOptions({ leadId }),
+		...trpc.communications.whatsappWindow.queryOptions({ leadId, contactId }),
 		enabled: channel === "whatsapp",
 		refetchInterval: WHATSAPP_UI.windowRefreshMs,
 	});
@@ -164,7 +179,7 @@ function CommunicationDialog({
 
 	return (
 		<Dialog
-			open={channel !== null}
+			open
 			onOpenChange={(open) => {
 				if (!open) onClose();
 			}}
@@ -179,6 +194,16 @@ function CommunicationDialog({
 					</DialogDescription>
 				</DialogHeader>
 				{status.isPending ? <Spinner /> : null}
+				{recipients.length > 1 ? (
+					<Field label="Send to">
+						<RecipientSelect
+							channel={channel}
+							onChange={setTo}
+							recipients={recipients}
+							value={to}
+						/>
+					</Field>
+				) : null}
 				{channel === "email" ? (
 					<div className="flex flex-col gap-4">
 						<Field label="Subject">
@@ -206,6 +231,7 @@ function CommunicationDialog({
 							onClick={() =>
 								emailMutation.mutate({
 									leadId,
+									contactId,
 									subject,
 									body,
 									attachments: emailFiles.map(
@@ -228,6 +254,7 @@ function CommunicationDialog({
 							<WhatsAppWindowAlert state={windowState.data} />
 						) : null}
 						<WhatsAppMediaComposer
+							contactId={contactId}
 							caption={mode === "text" ? body : ""}
 							disabled={pending || !whatsappReady || !windowOpen}
 							leadId={leadId}
@@ -322,6 +349,7 @@ function CommunicationDialog({
 									mode === "text"
 										? {
 												leadId,
+												contactId,
 												mode,
 												body,
 												language: "en_US",
@@ -329,6 +357,7 @@ function CommunicationDialog({
 											}
 										: {
 												leadId,
+												contactId,
 												mode,
 												templateName: template?.providerTemplateName ?? "",
 												language: template?.language ?? "en_US",

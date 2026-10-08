@@ -20,10 +20,12 @@ import {
 	conversationsOutput,
 	leadNotesOutput,
 	markReadOutput,
+	recipientsOutput,
 	sendEmailInput,
 	sendMessageOutput,
 	sendWhatsAppInput,
 	unreadOutput,
+	whatsappWindowInput,
 	whatsappWindowOutput,
 } from "./communications.contracts";
 import { CommunicationsService } from "./communications.service";
@@ -72,9 +74,14 @@ export class CommunicationsRouter {
 		return this.communications.conversation(input.leadId);
 	}
 
-	@Query({ input: conversationInput, output: whatsappWindowOutput })
-	whatsappWindow(@Input() input: z.infer<typeof conversationInput>) {
-		return this.communications.whatsappWindow(input.leadId);
+	@Query({ input: whatsappWindowInput, output: whatsappWindowOutput })
+	whatsappWindow(@Input() input: z.infer<typeof whatsappWindowInput>) {
+		return this.communications.whatsappWindow(input.leadId, input.contactId);
+	}
+
+	@Query({ input: conversationInput, output: recipientsOutput })
+	recipients(@Input() input: z.infer<typeof conversationInput>) {
+		return this.communications.recipients(input.leadId);
 	}
 
 	@Mutation({ input: addNoteInput, output: addNoteOutput })

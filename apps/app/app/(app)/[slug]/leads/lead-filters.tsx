@@ -31,7 +31,13 @@ export function useLeadFilters() {
 	};
 }
 
-export function LeadFilters({ loading }: { loading: boolean }) {
+export function LeadFilters({
+	loading,
+	showStatus,
+}: {
+	loading: boolean;
+	showStatus: boolean;
+}) {
 	const trpc = useTRPC();
 	const owners = useQuery(trpc.leads.owners.queryOptions());
 	const { values, setValues } = useLeadFilters();
@@ -41,7 +47,12 @@ export function LeadFilters({ loading }: { loading: boolean }) {
 			? `${LEAD_BOARD.filter.ownerPrefix}${values.owner}`
 			: LEAD_BOARD.filter.all;
 	const active = Boolean(
-		values.q || values.entity || values.kind || values.owner || values.mine,
+		values.q ||
+			values.entity ||
+			values.kind ||
+			values.owner ||
+			values.mine ||
+			(showStatus && values.status),
 	);
 
 	return (
@@ -60,6 +71,32 @@ export function LeadFilters({ loading }: { loading: boolean }) {
 					value={values.q}
 				/>
 			</InputGroup>
+
+			{showStatus ? (
+				<Select
+					onValueChange={(value) =>
+						void setValues({
+							status:
+								value === LEAD_BOARD.filter.all
+									? null
+									: (value as (typeof LEAD_BOARD.stages)[number]),
+						})
+					}
+					value={values.status ?? LEAD_BOARD.filter.all}
+				>
+					<SelectTrigger aria-label="Filter by status">
+						<SelectValue />
+					</SelectTrigger>
+					<SelectContent>
+						<SelectItem value={LEAD_BOARD.filter.all}>All statuses</SelectItem>
+						{LEAD_BOARD.stages.map((stage) => (
+							<SelectItem key={stage} value={stage}>
+								{LEAD_BOARD.label[stage]}
+							</SelectItem>
+						))}
+					</SelectContent>
+				</Select>
+			) : null}
 
 			<Select
 				onValueChange={(value) =>

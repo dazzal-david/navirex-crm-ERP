@@ -24,9 +24,11 @@ export async function sendWhatsAppFile(
 	file: Blob,
 	filename: string,
 	caption?: string,
+	contactId?: string,
 ): Promise<void> {
 	const params = new URLSearchParams({ filename });
 	if (caption?.trim()) params.set("caption", caption.trim());
+	if (contactId) params.set("contactId", contactId);
 	const response = await fetch(
 		`/api/communications/whatsapp/${encodeURIComponent(leadId)}/media?${params}`,
 		{
@@ -47,11 +49,13 @@ export async function sendWhatsAppFile(
 
 export function WhatsAppMediaComposer({
 	leadId,
+	contactId,
 	caption,
 	disabled,
 	onSent,
 }: {
 	leadId: string;
+	contactId?: string;
 	caption: string;
 	disabled: boolean;
 	onSent: () => void;
@@ -166,6 +170,7 @@ export function WhatsAppMediaComposer({
 				draft.file,
 				draft.filename,
 				draft.file.type.startsWith("audio/") ? undefined : caption,
+				contactId,
 			);
 			toast.success("File sent on WhatsApp.");
 			setDraft(null);

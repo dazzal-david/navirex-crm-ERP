@@ -22,6 +22,7 @@ import { useDeferredValue, useRef, useState } from "react";
 import { toast } from "sonner";
 import { useOpenRecord } from "@/components/crm/record-sheet/record-stack";
 import { LEAD_BOARD } from "@/lib/leads/board-config";
+import { leadTitle } from "@/lib/leads/lead-title";
 import { useTRPC } from "@/lib/trpc/client";
 import type { RouterOutputs } from "@/lib/trpc/types";
 import { LeadFilters, useLeadFilters } from "./lead-filters";
@@ -49,7 +50,7 @@ type ColumnSnapshot = {
 export function LeadBoard() {
 	const trpc = useTRPC();
 	const queryClient = useQueryClient();
-	const { filters: urlFilters } = useLeadFilters();
+	const { filters: urlFilters, values, setValues } = useLeadFilters();
 	const deferredQuery = useDeferredValue(urlFilters.q);
 	const filters = { ...urlFilters };
 	if (deferredQuery) filters.q = deferredQuery;
@@ -58,7 +59,9 @@ export function LeadBoard() {
 	const board = useQuery(options);
 	const [dragging, setDragging] = useState<LeadCard | null>(null);
 	const [dropTarget, setDropTarget] = useState<DropTarget | null>(null);
-	const [view, setView] = useState<"board" | "list">("board");
+	const [view, setView] = useState<"board" | "list">(() =>
+		values.status ? "list" : "board",
+	);
 
 	const columnQueryKey = (stage: LeadStage) =>
 		trpc.leads.column.infiniteQueryOptions(
@@ -171,11 +174,14 @@ export function LeadBoard() {
 	return (
 		<div className="flex min-h-0 flex-1 flex-col gap-4">
 			<div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border bg-card p-3 shadow-sm">
-				<LeadFilters loading={board.isFetching} />
+				<LeadFilters loading={board.isFetching} showStatus={view === "list"} />
 				<div className="flex rounded-lg border bg-muted/40 p-1">
 					<Button
 						aria-label="Board view"
-						onClick={() => setView("board")}
+						onClick={() => {
+							setView("board");
+							void setValues({ status: null });
+						}}
 						size="sm"
 						variant={view === "board" ? "default" : "ghost"}
 					>
@@ -440,15 +446,17 @@ function LeadCardView({
 		>
 			<CardContent className="flex flex-col gap-3 rounded-xl border-0 p-4">
 				<div className="flex items-start justify-between gap-2">
-					<p className="truncate font-medium text-sm">{lead.name}</p>
+					<p className="truncate font-medium text-sm">
+						{leadTitle(lead).title}
+					</p>
 					{lead.entity ? (
 						<Badge variant="outline">{LEAD_BOARD.entity[lead.entity]}</Badge>
 					) : null}
 				</div>
 
-				{lead.companyName ? (
+				{leadTitle(lead).subtitle ? (
 					<p className="truncate text-muted-foreground text-xs">
-						{lead.companyName}
+						{leadTitle(lead).subtitle}
 					</p>
 				) : null}
 

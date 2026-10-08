@@ -100,12 +100,27 @@ export function useRecordStack() {
 
 	const closeAll = useCallback(() => write([], "replace"), [write]);
 
+	const replaceTop = useCallback(
+		(ref: RecordRef) => {
+			const key = recordKey(ref);
+			write(
+				[
+					...stack.slice(0, -1).filter((entry) => recordKey(entry) !== key),
+					ref,
+				],
+				"replace",
+			);
+		},
+		[stack, write],
+	);
+
 	return {
 		stack,
 		top: stack.at(-1) ?? null,
 		open,
 		close,
 		closeAll,
+		replaceTop,
 	};
 }
 

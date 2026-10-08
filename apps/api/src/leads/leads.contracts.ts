@@ -76,6 +76,7 @@ export const columnPageOutput = z.object({
 
 export const leadListInput = boardInput.extend({
 	cursor: z.string().optional(),
+	stage: leadStage.optional(),
 });
 
 export const leadListOutput = z.object({
@@ -184,6 +185,53 @@ export const leadAssignInput = z.object({
 	id: z.string(),
 	ownerId: z.string().nullable(),
 });
+
+export const leadContact = z.object({
+	id: z.string(),
+	name: z.string(),
+	designation: z.string().nullable(),
+	phone: z.string().nullable(),
+	email: z.string().nullable(),
+	createdAt: z.date(),
+});
+
+export const leadContactsOutput = z.array(leadContact);
+
+export const leadContactCreateInput = z.object({
+	leadId: z.string(),
+	name: z.string().trim().min(1).max(200),
+	designation: z.string().trim().max(200).optional(),
+	phone: z.string().trim().max(50).optional(),
+	email: optionalEmail,
+});
+
+export const leadContactUpdateInput = leadContactCreateInput
+	.omit({ leadId: true })
+	.partial()
+	.extend({ id: z.string() });
+
+export const leadContactIdInput = z.object({ id: z.string() });
+
+export const leadMergeInput = z.object({
+	sourceId: z.string(),
+	targetId: z.string(),
+});
+
+export const leadIdOnlyOutput = z.object({ leadId: z.string() });
+
+export const sameCompanyOutput = z.array(
+	z.object({
+		id: z.string(),
+		name: z.string(),
+		companyName: z.string().nullable(),
+		stage: leadStage,
+		createdAt: z.date(),
+		owner: z.object({ id: z.string(), name: z.string() }).nullable(),
+	}),
+);
+
+export type LeadContactCreateInput = z.infer<typeof leadContactCreateInput>;
+export type LeadContactUpdateInput = z.infer<typeof leadContactUpdateInput>;
 
 export const leadDetailOutput = leadCard.extend({
 	secondaryPhone: z.string().nullable(),

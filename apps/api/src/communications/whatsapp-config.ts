@@ -17,6 +17,7 @@ export const WHATSAPP = {
 	windowClosedCodes: [131047],
 	webhookFields: ["messages", "smb_message_echoes"],
 	conversationLimit: 250,
+	windowScanLimit: 200,
 	noteLimit: 500,
 	mediaKinds: {
 		image: ["image/jpeg", "image/png"],

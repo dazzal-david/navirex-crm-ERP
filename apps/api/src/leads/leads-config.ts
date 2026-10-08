@@ -6,6 +6,7 @@ export const LEADS = {
 	board: { columnLimit: 100 },
 	activeStages: ACTIVE_STAGES,
 	unassigned: { pageSize: 50, assignLimit: 1000 },
+	contacts: { sameCompanyLimit: 10 },
 	position: { gap: 1000 },
 	stageLabel: {
 		NOT_CONTACTED: "Not contacted",

@@ -39,6 +39,11 @@ import {
 	type EmailAttachmentFile,
 	EmailAttachmentPicker,
 } from "@/components/crm/email/email-attachment-picker";
+import {
+	contactIdOf,
+	defaultRecipient,
+	RecipientSelect,
+} from "@/components/crm/record-sheet/recipient-select";
 import { useOpenRecord } from "@/components/crm/record-sheet/record-stack";
 import { WhatsAppAttachment } from "@/components/crm/whatsapp/whatsapp-attachment";
 import { WhatsAppMediaComposer } from "@/components/crm/whatsapp/whatsapp-media-composer";
@@ -50,6 +55,7 @@ import {
 } from "@/components/crm/whatsapp/whatsapp-template-fields";
 import { WhatsAppTemplatePreview } from "@/components/crm/whatsapp/whatsapp-template-preview";
 import { WhatsAppWindowAlert } from "@/components/crm/whatsapp/whatsapp-window-alert";
+import { WHATSAPP_UI } from "@/lib/communications/whatsapp-config";
 import { useTRPC } from "@/lib/trpc/client";
 import type { RouterOutputs } from "@/lib/trpc/types";
 
@@ -75,6 +81,11 @@ export function CommunicationsInbox() {
 		refetchInterval: 60_000,
 	});
 	const [selectedId, setSelectedId] = useState<string | null>(null);
+	const [to, setTo] = useState<{
+		leadId: string;
+		channel: "email" | "whatsapp";
+		key: string;
+	} | null>(null);
 	const [query, setQuery] = useState("");
 	const [channel, setChannel] = useState<Channel>("note");
 	const [subject, setSubject] = useState("Following up from Navirex");
@@ -169,7 +180,24 @@ export function CommunicationsInbox() {
 		(template) => template.id === selectedTemplateId,
 	);
 	const pending = note.isPending || email.isPending || whatsapp.isPending;
-	const whatsappWindow = conversation.data?.whatsappWindow ?? null;
+	const recipients = conversation.data?.recipients ?? [];
+	const recipientChannel = channel === "email" ? "email" : "whatsapp";
+	const toKey =
+		to && to.leadId === activeId && to.channel === recipientChannel
+			? to.key
+			: defaultRecipient(recipients, recipientChannel);
+	const contactId = contactIdOf(toKey);
+	const contactWindow = useQuery({
+		...trpc.communications.whatsappWindow.queryOptions({
+			leadId: activeId ?? "",
+			contactId,
+		}),
+		enabled: activeId !== null && contactId !== undefined,
+		refetchInterval: WHATSAPP_UI.contactWindowRefreshMs,
+	});
+	const whatsappWindow = contactId
+		? (contactWindow.data ?? null)
+		: (conversation.data?.whatsappWindow ?? null);
 	const usingWhatsAppTemplate = Boolean(selectedTemplate?.providerTemplateName);
 
 	const templatesOnly =
@@ -333,6 +361,22 @@ export function CommunicationsInbox() {
 									</SelectContent>
 								</Select>
 							</div>
+							{channel !== "note" && recipients.length > 1 && activeId ? (
+								<div className="mb-2">
+									<RecipientSelect
+										channel={recipientChannel}
+										onChange={(key) =>
+											setTo({
+												leadId: activeId,
+												channel: recipientChannel,
+												key,
+											})
+										}
+										recipients={recipients}
+										value={toKey}
+									/>
+								</div>
+							) : null}
 							{channel === "whatsapp" && whatsappWindow ? (
 								<div className="mb-2">
 									<WhatsAppWindowAlert state={whatsappWindow} />
@@ -379,6 +423,7 @@ export function CommunicationsInbox() {
 											!status.data?.whatsapp ||
 											whatsappWindow?.open !== true
 										}
+										contactId={contactId}
 										leadId={activeId}
 										onSent={() => void refresh()}
 									/>
@@ -412,6 +457,7 @@ export function CommunicationsInbox() {
 										if (channel === "email")
 											email.mutate({
 												leadId: activeId,
+												contactId,
 												subject,
 												body,
 												attachments: emailFiles.map(
@@ -425,6 +471,7 @@ export function CommunicationsInbox() {
 												providerName
 													? {
 															leadId: activeId,
+															contactId,
 															mode: "template",
 															templateName: providerName,
 															language: selectedTemplate.language,
@@ -435,6 +482,7 @@ export function CommunicationsInbox() {
 														}
 													: {
 															leadId: activeId,
+															contactId,
 															mode: "text",
 															body,
 															language: "en_US",
@@ -513,8 +561,11 @@ function ConversationBubble({
 						</BubbleContent>
 					</Bubble>
 					<MessageFooter>
-						{item.authorName ?? leadName} ·{" "}
-						{new Date(item.occurredAt).toLocaleString()}
+						{item.authorName ?? leadName}
+						{item.direction === "outbound" && item.recipientName
+							? ` → ${item.recipientName}`
+							: ""}{" "}
+						· {new Date(item.occurredAt).toLocaleString()}
 						{item.deliveryStatus === "failed"
 							? ` · Not delivered${item.deliveryError ? `: ${item.deliveryError}` : ""}`
 							: item.deliveryStatus === "read"

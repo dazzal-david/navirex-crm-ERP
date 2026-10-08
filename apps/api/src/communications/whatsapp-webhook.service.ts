@@ -176,10 +176,32 @@ export class WhatsAppWebhookService {
 			where: { archivedAt: null, phone: { not: null } },
 			select: { id: true, ownerId: true, phone: true },
 		});
+		const people = await this.db.leadContact.findMany({
+			where: { phone: { not: null }, lead: { archivedAt: null } },
+			select: {
+				id: true,
+				name: true,
+				phone: true,
+				lead: { select: { id: true, ownerId: true, phone: true } },
+			},
+		});
+		const exactPerson = people.find(
+			(person) => normalizePhone(person.phone ?? "") === phone,
+		);
+		const exactLead = candidates.find(
+			(candidate) => normalizePhone(candidate.phone ?? "") === phone,
+		);
+		const person =
+			exactLead || exactPerson
+				? exactPerson
+				: people.find((candidate) => samePhone(candidate.phone, phone));
 		let lead =
-			candidates.find(
-				(candidate) => normalizePhone(candidate.phone ?? "") === phone,
-			) ?? candidates.find((candidate) => samePhone(candidate.phone, phone));
+			exactLead ??
+			person?.lead ??
+			candidates.find((candidate) => samePhone(candidate.phone, phone));
+		const contactId =
+			lead && person && lead.id === person.lead.id ? person.id : null;
+		const contactName = contactId ? (person?.name ?? null) : null;
 		if (!lead) {
 			const result = await this.leads.intake({
 				name: fromName?.trim() || `WhatsApp ${phone.slice(-4)}`,
@@ -226,6 +248,8 @@ export class WhatsAppWebhookService {
 					meta: {
 						channel: "whatsapp",
 						direction,
+						contactId,
+						toName: direction === "outbound" ? contactName : null,
 						...(direction === "inbound"
 							? { from: phone, fromName: fromName ?? null }
 							: { to: phone, mode: "phone" }),

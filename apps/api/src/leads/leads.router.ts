@@ -11,6 +11,7 @@ import type { z } from "zod";
 import type { AuthedTrpcContext } from "../trpc/context.types";
 import { AuthMiddleware } from "../trpc/middlewares/auth.middleware";
 import { restMeta } from "../trpc/openapi";
+import { LeadContactsService } from "./lead-contacts.service";
 import {
 	boardInput,
 	boardOutput,
@@ -19,20 +20,28 @@ import {
 	leadAssignInput,
 	leadAssignManyInput,
 	leadAssignManyOutput,
+	leadContact,
+	leadContactCreateInput,
+	leadContactIdInput,
+	leadContactsOutput,
+	leadContactUpdateInput,
 	leadConvertOutput,
 	leadCreateInput,
 	leadDeleteOutput,
 	leadDetailOutput,
 	leadEpcOptionsOutput,
 	leadIdInput,
+	leadIdOnlyOutput,
 	leadIntakeInput,
 	leadIntakeOutput,
 	leadListInput,
 	leadListOutput,
+	leadMergeInput,
 	leadMoveInput,
 	leadMutateOutput,
 	leadOwnersOutput,
 	leadUpdateInput,
+	sameCompanyOutput,
 	unassignedLeadsInput,
 	unassignedLeadsOutput,
 	zohoImportInput,
@@ -43,7 +52,58 @@ import { LeadsService } from "./leads.service";
 @Router({ alias: "leads" })
 @UseMiddlewares(AuthMiddleware)
 export class LeadsRouter {
-	constructor(@Inject(LeadsService) private readonly leads: LeadsService) {}
+	constructor(
+		@Inject(LeadsService) private readonly leads: LeadsService,
+		@Inject(LeadContactsService)
+		private readonly contacts: LeadContactsService,
+	) {}
+
+	@Query({ input: leadIdInput, output: leadContactsOutput })
+	async contactsOf(@Input() input: z.infer<typeof leadIdInput>) {
+		return this.contacts.list(input.id);
+	}
+
+	@Mutation({ input: leadContactCreateInput, output: leadContact })
+	async addContact(
+		@Input() input: z.infer<typeof leadContactCreateInput>,
+		@Ctx() ctx: AuthedTrpcContext,
+	) {
+		return this.contacts.add(input, ctx.user.id);
+	}
+
+	@Mutation({ input: leadContactUpdateInput, output: leadContact })
+	async updateContact(@Input() input: z.infer<typeof leadContactUpdateInput>) {
+		return this.contacts.update(input);
+	}
+
+	@Mutation({ input: leadContactIdInput, output: leadContactIdInput })
+	async removeContact(
+		@Input() input: z.infer<typeof leadContactIdInput>,
+		@Ctx() ctx: AuthedTrpcContext,
+	) {
+		return this.contacts.remove(input.id, ctx.user.id);
+	}
+
+	@Mutation({ input: leadContactIdInput, output: leadIdOnlyOutput })
+	async makePrimaryContact(
+		@Input() input: z.infer<typeof leadContactIdInput>,
+		@Ctx() ctx: AuthedTrpcContext,
+	) {
+		return this.contacts.makePrimary(input.id, ctx.user.id);
+	}
+
+	@Query({ input: leadIdInput, output: sameCompanyOutput })
+	async sameCompany(@Input() input: z.infer<typeof leadIdInput>) {
+		return this.contacts.sameCompany(input.id);
+	}
+
+	@Mutation({ input: leadMergeInput, output: leadIdOnlyOutput })
+	async merge(
+		@Input() input: z.infer<typeof leadMergeInput>,
+		@Ctx() ctx: AuthedTrpcContext,
+	) {
+		return this.contacts.merge(input.sourceId, input.targetId, ctx.user.id);
+	}
 
 	@Query({
 		input: boardInput,

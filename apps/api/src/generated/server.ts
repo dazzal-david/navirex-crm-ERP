@@ -16,7 +16,7 @@ const publicProcedure = t.procedure;
 import { timelineInput, timelineOutput, timelineCountsInput, timelineCountsOutput, myTasksInput, myTasksOutput, activityCreateInput, activityCreateOutput, completeInput, completeOutput } from "../activities/activities.contracts";
 import { agentListOutput, agentReviseInput, agentReviseOutput, agentIdInput, agentFilesOutput, agentSaveFileInput, agentSaveFileOutput, agentByIdOutput, agentHistoryInput, agentHistoryOutput, agentActivityOutput, agentUpdateInput, agentUpdateOutput, agentDeployInput, agentDeployOutput, agentPauseOutput, agentResumeOutput, agentArchiveOutput, agentRestoreOutput, agentRemoveOutput, agentRunNowInput, agentRunNowOutput, agentRetryRunInput, agentRetryRunOutput, agentCancelRunInput, agentCancelRunOutput } from "../agent/agents.contracts";
 import { apiKeyListInput, apiKeyListOutput, createApiKeyInput, createApiKeyOutput, revokeApiKeyInput, revokeApiKeyOutput } from "../api-keys/api-keys.contracts";
-import { communicationStatusOutput, conversationsOutput, unreadOutput, conversationInput, markReadOutput, leadNotesOutput, conversationOutput, whatsappWindowOutput, addNoteInput, addNoteOutput, sendEmailInput, sendMessageOutput, sendWhatsAppInput } from "../communications/communications.contracts";
+import { communicationStatusOutput, conversationsOutput, unreadOutput, conversationInput, markReadOutput, leadNotesOutput, conversationOutput, whatsappWindowInput, whatsappWindowOutput, recipientsOutput, addNoteInput, addNoteOutput, sendEmailInput, sendMessageOutput, sendWhatsAppInput } from "../communications/communications.contracts";
 import { companyListInput, companyListOutput, companyIdInput, companyDetailOutput, companyOptionsInput, companyOptionOutput, companyCreateInput, companySummaryOutput, companyUpdateArgs, companyArchiveResultOutput, companyBulkOwnerInput, companyBulkResultOutput, companyBulkInput, companyEnrichOutput, companyResearchOutput, setPrimaryContactInput, companySetPrimaryContactOutput } from "../companies/companies.contracts";
 import { contactListInput, contactListOutput, contactIdInput, contactByIdOutput, contactCreateInput, contactBasicOutput, contactUpdateArgs, contactNameOutput, contactEnrichOutput, contactBulkOwnerInput, bulkResultOutput, contactBulkCompanyInput, contactBulkInput, factDecisionInput, decideFactOutput } from "../contacts/contacts.contracts";
 import { conversationListInput, conversationListOutput, builderListOutput, builderResourceSearchInput, builderResourcesOutput, conversationIdInput, builderConversationDetailOutput, conversationEventsInput, conversationEventsOutput, conversationSaveInput, conversationIdOutput, builderConversationCreateInput, builderConversationSubmitInput, builderQuestionResponseInput, builderResponseRatingInput, builderResponseRatingOutput, conversationShareStatusOutput, conversationShareTokenOutput, sharedConversationInput, sharedConversationOutput } from "../conversations/conversations.contracts";
@@ -28,7 +28,7 @@ import { fieldListInput, fieldListOutput, fieldByKeyInput, serializedFieldOutput
 import { googleConnectionStatusOutput, setAutoCreateInput, suppressDomainInput, suppressDomainOutput, threadInput, emailThreadOutput, calendarEventInput, calendarEventOutput } from "../google/google.contracts";
 import { purgeSyncedDataOutput, revokeAccessOutput, microsoftConnectionStatusOutput, setOutlookAutoCreateInput } from "../microsoft/microsoft.contracts";
 import { invitationsOutput, inviteInput, inviteOutput, invitationIdInput, invitationOutput, removeMemberInput, removeMemberOutput } from "../invitations/invitations.contracts";
-import { boardInput, boardOutput, columnPageInput, columnPageOutput, leadListInput, leadListOutput, leadIdInput, leadDetailOutput, leadOwnersOutput, leadEpcOptionsOutput, unassignedLeadsInput, unassignedLeadsOutput, leadAssignManyInput, leadAssignManyOutput, leadCreateInput, leadMutateOutput, leadIntakeInput, leadIntakeOutput, zohoImportInput, zohoImportOutput, leadUpdateInput, leadMoveInput, leadAssignInput, leadConvertOutput, leadDeleteOutput } from "../leads/leads.contracts";
+import { leadIdInput, leadContactsOutput, leadContactCreateInput, leadContact, leadContactUpdateInput, leadContactIdInput, leadIdOnlyOutput, sameCompanyOutput, leadMergeInput, boardInput, boardOutput, columnPageInput, columnPageOutput, leadListInput, leadListOutput, leadDetailOutput, leadOwnersOutput, leadEpcOptionsOutput, unassignedLeadsInput, unassignedLeadsOutput, leadAssignManyInput, leadAssignManyOutput, leadCreateInput, leadMutateOutput, leadIntakeInput, leadIntakeOutput, zohoImportInput, zohoImportOutput, leadUpdateInput, leadMoveInput, leadAssignInput, leadConvertOutput, leadDeleteOutput } from "../leads/leads.contracts";
 import { metaStatusOutput, metaAvailablePagesOutput, metaPageInput, metaMutationOutput, metaSyncOutput } from "../meta/meta.contracts";
 import { employeePortalOutput, directoryOutput, updateMyProfileInput, employeeProfileOutput, updateEmployeeInput, reimbursementsOutput, submitReimbursementInput, reimbursementOutput, reviewReimbursementInput, reimbursementIdInput } from "../people/people.contracts";
 import { savedViewListInput, savedViewListOutput, savedViewCreateInput, savedViewOutput, savedViewUpdateArgs, savedViewIdInput, savedViewDeleteOutput } from "../saved-views/saved-views.contracts";
@@ -170,8 +170,12 @@ const appRouter = t.router({
       .output(conversationOutput)
       .query(async () => "PLACEHOLDER_DO_NOT_REMOVE" as any),
     whatsappWindow: publicProcedure
-      .input(conversationInput)
+      .input(whatsappWindowInput)
       .output(whatsappWindowOutput)
+      .query(async () => "PLACEHOLDER_DO_NOT_REMOVE" as any),
+    recipients: publicProcedure
+      .input(conversationInput)
+      .output(recipientsOutput)
       .query(async () => "PLACEHOLDER_DO_NOT_REMOVE" as any),
     addNote: publicProcedure
       .input(addNoteInput)
@@ -626,6 +630,34 @@ const appRouter = t.router({
       .mutation(async () => "PLACEHOLDER_DO_NOT_REMOVE" as any)
     }),
   leads: t.router({
+    contactsOf: publicProcedure
+      .input(leadIdInput)
+      .output(leadContactsOutput)
+      .query(async () => "PLACEHOLDER_DO_NOT_REMOVE" as any),
+    addContact: publicProcedure
+      .input(leadContactCreateInput)
+      .output(leadContact)
+      .mutation(async () => "PLACEHOLDER_DO_NOT_REMOVE" as any),
+    updateContact: publicProcedure
+      .input(leadContactUpdateInput)
+      .output(leadContact)
+      .mutation(async () => "PLACEHOLDER_DO_NOT_REMOVE" as any),
+    removeContact: publicProcedure
+      .input(leadContactIdInput)
+      .output(leadContactIdInput)
+      .mutation(async () => "PLACEHOLDER_DO_NOT_REMOVE" as any),
+    makePrimaryContact: publicProcedure
+      .input(leadContactIdInput)
+      .output(leadIdOnlyOutput)
+      .mutation(async () => "PLACEHOLDER_DO_NOT_REMOVE" as any),
+    sameCompany: publicProcedure
+      .input(leadIdInput)
+      .output(sameCompanyOutput)
+      .query(async () => "PLACEHOLDER_DO_NOT_REMOVE" as any),
+    merge: publicProcedure
+      .input(leadMergeInput)
+      .output(leadIdOnlyOutput)
+      .mutation(async () => "PLACEHOLDER_DO_NOT_REMOVE" as any),
     board: publicProcedure
       .input(boardInput)
       .output(boardOutput)
