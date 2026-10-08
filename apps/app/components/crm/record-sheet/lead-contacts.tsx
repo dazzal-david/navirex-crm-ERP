@@ -1,10 +1,8 @@
 "use client";
 
 import Add from "@carbon/icons-react/es/Add";
-import Edit from "@carbon/icons-react/es/Edit";
 import Star from "@carbon/icons-react/es/Star";
 import TrashCan from "@carbon/icons-react/es/TrashCan";
-import { Badge } from "@crm/ui/components/badge";
 import { Button } from "@crm/ui/components/button";
 import {
 	Dialog,
@@ -21,30 +19,22 @@ import { Spinner } from "@crm/ui/components/spinner";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useId, useState } from "react";
 import { toast } from "sonner";
+import { InlineTextCell } from "@/components/crm/inline-field";
 import { PhoneInput } from "@/components/crm/phone-input";
+import { DetailSheetProperties } from "@/components/detail-sheet";
 import { useTRPC } from "@/lib/trpc/client";
-
-type ContactRow = {
-	id: string;
-	name: string;
-	designation: string | null;
-	phone: string | null;
-	email: string | null;
-};
-
-type Editing = { mode: "add" } | { mode: "edit"; contact: ContactRow };
 
 export function LeadContacts({
 	leadId,
-	main,
+	mainCard,
 }: {
 	leadId: string;
-	main: Omit<ContactRow, "id">;
+	mainCard: React.ReactNode;
 }) {
 	const trpc = useTRPC();
 	const queryClient = useQueryClient();
 	const contacts = useQuery(trpc.leads.contactsOf.queryOptions({ id: leadId }));
-	const [editing, setEditing] = useState<Editing | null>(null);
+	const [adding, setAdding] = useState(false);
 
 	const refresh = () =>
 		Promise.all([
@@ -84,65 +74,98 @@ export function LeadContacts({
 		}),
 	);
 
+	const update = useMutation(
+		trpc.leads.updateContact.mutationOptions({
+			onSuccess: () => refresh(),
+			onError: (error) => toast.error(error.message),
+		}),
+	);
+
 	const busy = remove.isPending || makePrimary.isPending;
 
 	return (
-		<div className="flex flex-col gap-2">
-			<ul className="flex flex-col divide-y rounded-lg border">
-				<ContactLine contact={main}>
-					<Badge variant="secondary">Main</Badge>
-				</ContactLine>
-				{(contacts.data ?? []).map((contact) => (
-					<ContactLine contact={contact} key={contact.id}>
-						<Button
-							aria-label={`Make ${contact.name} the main contact`}
-							disabled={busy}
-							onClick={() => makePrimary.mutate({ id: contact.id })}
-							size="icon-sm"
-							title="Make main contact"
-							variant="ghost"
-						>
-							<Icon icon={Star} />
-						</Button>
-						<Button
-							aria-label={`Edit ${contact.name}`}
-							disabled={busy}
-							onClick={() => setEditing({ mode: "edit", contact })}
-							size="icon-sm"
-							variant="ghost"
-						>
-							<Icon icon={Edit} />
-						</Button>
-						<Button
-							aria-label={`Remove ${contact.name}`}
-							disabled={busy}
-							onClick={() => {
-								if (window.confirm(`Remove ${contact.name} from this lead?`)) {
-									remove.mutate({ id: contact.id });
-								}
-							}}
-							size="icon-sm"
-							variant="ghost"
-						>
-							<Icon icon={TrashCan} />
-						</Button>
-					</ContactLine>
-				))}
-			</ul>
+		<div className="flex flex-col gap-3">
+			{mainCard}
+			{(contacts.data ?? []).map((contact) => (
+				<PersonCard
+					actions={
+						<>
+							<Button
+								disabled={busy}
+								onClick={() => makePrimary.mutate({ id: contact.id })}
+								size="sm"
+								variant="ghost"
+							>
+								<Icon data-icon="inline-start" icon={Star} />
+								Make main
+							</Button>
+							<Button
+								aria-label={`Remove ${contact.name}`}
+								disabled={busy}
+								onClick={() => {
+									if (
+										window.confirm(`Remove ${contact.name} from this lead?`)
+									) {
+										remove.mutate({ id: contact.id });
+									}
+								}}
+								size="icon-sm"
+								variant="ghost"
+							>
+								<Icon icon={TrashCan} />
+							</Button>
+						</>
+					}
+					key={contact.id}
+					name={contact.name}
+				>
+					<InlineTextCell
+						label="Name"
+						onSave={(next) => {
+							if (next) update.mutate({ id: contact.id, name: next });
+						}}
+						placeholder="Add a name"
+						saving={update.isPending}
+						value={contact.name}
+					/>
+					<InlineTextCell
+						label="Designation / role"
+						onSave={(next) =>
+							update.mutate({ id: contact.id, designation: next })
+						}
+						placeholder="Add a designation"
+						saving={update.isPending}
+						value={contact.designation}
+					/>
+					<InlineTextCell
+						label="Mobile number"
+						onSave={(next) => update.mutate({ id: contact.id, phone: next })}
+						placeholder="Add a phone number"
+						saving={update.isPending}
+						value={contact.phone}
+					/>
+					<InlineTextCell
+						label="Email"
+						onSave={(next) => update.mutate({ id: contact.id, email: next })}
+						placeholder="Add an email"
+						saving={update.isPending}
+						value={contact.email}
+					/>
+				</PersonCard>
+			))}
 			<Button
 				className="self-start"
-				onClick={() => setEditing({ mode: "add" })}
+				onClick={() => setAdding(true)}
 				size="sm"
 				variant="outline"
 			>
 				<Icon data-icon="inline-start" icon={Add} />
 				Add contact
 			</Button>
-			{editing ? (
+			{adding ? (
 				<ContactDialog
-					editing={editing}
 					leadId={leadId}
-					onClose={() => setEditing(null)}
+					onClose={() => setAdding(false)}
 					onSaved={refresh}
 				/>
 			) : null}
@@ -150,42 +173,33 @@ export function LeadContacts({
 	);
 }
 
-function ContactLine({
-	contact,
+export function PersonCard({
+	name,
+	actions,
 	children,
 }: {
-	contact: Omit<ContactRow, "id">;
+	name: string;
+	actions: React.ReactNode;
 	children: React.ReactNode;
 }) {
 	return (
-		<li className="flex items-start gap-3 p-3">
-			<div className="flex min-w-0 flex-1 flex-col gap-0.5">
-				<span className="truncate font-medium text-sm">
-					{contact.name}
-					{contact.designation ? (
-						<span className="font-normal text-muted-foreground">
-							{" "}
-							· {contact.designation}
-						</span>
-					) : null}
+		<div className="rounded-2xl border bg-card p-4 shadow-xs">
+			<div className="mb-2 flex items-center gap-2">
+				<span className="min-w-0 flex-1 truncate font-medium text-sm">
+					{name}
 				</span>
-				<span className="truncate text-muted-foreground text-xs">
-					{[contact.phone, contact.email].filter(Boolean).join(" · ") ||
-						"No phone or email"}
-				</span>
+				<div className="flex shrink-0 items-center gap-1">{actions}</div>
 			</div>
-			<div className="flex shrink-0 items-center gap-1">{children}</div>
-		</li>
+			<DetailSheetProperties>{children}</DetailSheetProperties>
+		</div>
 	);
 }
 
 function ContactDialog({
-	editing,
 	leadId,
 	onClose,
 	onSaved,
 }: {
-	editing: Editing;
 	leadId: string;
 	onClose: () => void;
 	onSaved: () => Promise<unknown>;
@@ -195,27 +209,17 @@ function ContactDialog({
 	const designationId = useId();
 	const phoneId = useId();
 	const emailId = useId();
-	const current = editing.mode === "edit" ? editing.contact : null;
-
-	const done = async (message: string) => {
-		toast.success(message);
-		await onSaved();
-		onClose();
-	};
 
 	const add = useMutation(
 		trpc.leads.addContact.mutationOptions({
-			onSuccess: () => done("Contact added."),
+			onSuccess: async () => {
+				toast.success("Contact added.");
+				await onSaved();
+				onClose();
+			},
 			onError: (error) => toast.error(error.message),
 		}),
 	);
-	const update = useMutation(
-		trpc.leads.updateContact.mutationOptions({
-			onSuccess: () => done("Contact saved."),
-			onError: (error) => toast.error(error.message),
-		}),
-	);
-	const pending = add.isPending || update.isPending;
 
 	return (
 		<Dialog
@@ -226,7 +230,7 @@ function ContactDialog({
 		>
 			<DialogContent>
 				<DialogHeader>
-					<DialogTitle>{current ? "Edit contact" : "Add contact"}</DialogTitle>
+					<DialogTitle>Add contact</DialogTitle>
 					<DialogDescription>
 						Another person at this company. The lead keeps one owner and one
 						status.
@@ -240,33 +244,25 @@ function ContactDialog({
 						const text = (key: string) => String(form.get(key) ?? "").trim();
 						const name = text("name");
 						if (!name) return;
-						const fields = {
+						add.mutate({
+							leadId,
 							name,
 							designation: text("designation"),
 							phone: text("phone"),
 							email: text("email"),
-						};
-						if (current) update.mutate({ id: current.id, ...fields });
-						else add.mutate({ leadId, ...fields });
+						});
 					}}
 				>
 					<FieldGroup>
 						<Field>
 							<FieldLabel htmlFor={nameId}>Name *</FieldLabel>
-							<Input
-								autoFocus
-								defaultValue={current?.name}
-								id={nameId}
-								name="name"
-								required
-							/>
+							<Input autoFocus id={nameId} name="name" required />
 						</Field>
 						<Field>
 							<FieldLabel htmlFor={designationId}>
 								Designation / role
 							</FieldLabel>
 							<Input
-								defaultValue={current?.designation ?? undefined}
 								id={designationId}
 								name="designation"
 								placeholder="e.g. Procurement head"
@@ -274,22 +270,11 @@ function ContactDialog({
 						</Field>
 						<Field>
 							<FieldLabel htmlFor={phoneId}>Mobile number</FieldLabel>
-							{current ? (
-								<Input
-									defaultValue={current.phone ?? undefined}
-									id={phoneId}
-									name="phone"
-									placeholder="+91 99467 88886"
-									type="tel"
-								/>
-							) : (
-								<PhoneInput id={phoneId} label="Mobile number" name="phone" />
-							)}
+							<PhoneInput id={phoneId} label="Mobile number" name="phone" />
 						</Field>
 						<Field>
 							<FieldLabel htmlFor={emailId}>Email</FieldLabel>
 							<Input
-								defaultValue={current?.email ?? undefined}
 								id={emailId}
 								name="email"
 								placeholder="name@company.com"
@@ -298,9 +283,9 @@ function ContactDialog({
 						</Field>
 					</FieldGroup>
 					<DialogFooter>
-						<Button disabled={pending} type="submit">
-							{pending ? <Spinner data-icon="inline-start" /> : null}
-							{current ? "Save contact" : "Add contact"}
+						<Button disabled={add.isPending} type="submit">
+							{add.isPending ? <Spinner data-icon="inline-start" /> : null}
+							Add contact
 						</Button>
 					</DialogFooter>
 				</form>

@@ -26,11 +26,12 @@ import {
 } from "@/components/detail-sheet";
 import { LocalRelativeTime } from "@/components/local-date-time";
 import { LEAD_BOARD } from "@/lib/leads/board-config";
+import { leadTitle } from "@/lib/leads/lead-title";
 import { useCrmCache } from "@/lib/trpc/cache";
 import { useTRPC } from "@/lib/trpc/client";
 import type { RouterOutputs } from "@/lib/trpc/types";
 import { LeadCommunicationActions } from "./lead-communications";
-import { LeadContacts } from "./lead-contacts";
+import { LeadContacts, PersonCard } from "./lead-contacts";
 import { MergeLeadButton, SameCompanyNotice } from "./lead-merge";
 import { LeadNotes } from "./lead-notes";
 import { RecordSheetFrame } from "./record-parts";
@@ -125,6 +126,7 @@ export function LeadSheet({ leadId }: { leadId: string }) {
 		enabled: query.data?.kind === "CUSTOMER",
 	});
 	const lead = query.data;
+	const people = useQuery(trpc.leads.contactsOf.queryOptions({ id: leadId }));
 
 	const { update, assign, convert } = useLeadMutations(leadId);
 
@@ -283,8 +285,17 @@ export function LeadSheet({ leadId }: { leadId: string }) {
 			onTabChange={setTab}
 			tab={tab}
 			tabs={tabs}
-			title={lead?.name ?? "Lead"}
-			description={lead?.companyName ?? undefined}
+			title={lead ? leadTitle(lead).title : "Lead"}
+			description={
+				lead
+					? leadTitle(lead).subtitle === lead.name
+						? [
+								lead.name,
+								...(people.data ?? []).map((person) => person.name),
+							].join(" · ")
+						: (lead.companyName ?? undefined)
+					: undefined
+			}
 		/>
 	);
 }
@@ -367,43 +378,9 @@ function LeadOverview({
 				</div>
 			</DetailSheetSection>
 
-			<DetailSheetSection className="py-5" title="People at this company">
-				<LeadContacts
-					leadId={lead.id}
-					main={{
-						name: lead.name,
-						designation: lead.designation,
-						phone: lead.phone,
-						email: lead.email,
-					}}
-				/>
-			</DetailSheetSection>
-
-			<DetailSheetSection className="py-5" title="Main contact details">
+			<DetailSheetSection className="py-5" title="Company">
 				<div className="rounded-2xl border bg-card p-4 shadow-xs">
 					<DetailSheetProperties>
-						<InlineTextCell
-							label="Name"
-							onSave={(next) => {
-								if (next) onUpdate({ name: next });
-							}}
-							placeholder="Add a name"
-							saving={saving}
-							value={lead.name}
-						/>
-
-						{(LEAD_BOARD.designationKinds as readonly string[]).includes(
-							lead.kind,
-						) ? (
-							<InlineTextCell
-								label="Designation / role"
-								onSave={(next) => onUpdate({ designation: next })}
-								placeholder="Add a designation"
-								saving={saving}
-								value={lead.designation}
-							/>
-						) : null}
-
 						<InlineTextCell
 							label="Company"
 							onSave={(next) => onUpdate({ companyName: next })}
@@ -434,38 +411,6 @@ function LeadOverview({
 						) : null}
 
 						<InlineTextCell
-							label="Email"
-							onSave={(next) => onUpdate({ email: next })}
-							placeholder="Add an email"
-							saving={saving}
-							value={lead.email}
-						/>
-
-						<InlineTextCell
-							label="Secondary email"
-							onSave={(next) => onUpdate({ secondaryEmail: next })}
-							placeholder="Add an email"
-							saving={saving}
-							value={lead.secondaryEmail}
-						/>
-
-						<InlineTextCell
-							label="Mobile number"
-							onSave={(next) => onUpdate({ phone: next })}
-							placeholder="Add a phone number"
-							saving={saving}
-							value={lead.phone}
-						/>
-
-						<InlineTextCell
-							label="Secondary phone"
-							onSave={(next) => onUpdate({ secondaryPhone: next })}
-							placeholder="Add a phone number"
-							saving={saving}
-							value={lead.secondaryPhone}
-						/>
-
-						<InlineTextCell
 							label="Website"
 							onSave={(next) => onUpdate({ website: next })}
 							placeholder="Add a website"
@@ -482,6 +427,67 @@ function LeadOverview({
 						/>
 					</DetailSheetProperties>
 				</div>
+			</DetailSheetSection>
+
+			<DetailSheetSection className="py-5" title="People at this company">
+				<LeadContacts
+					leadId={lead.id}
+					mainCard={
+						<PersonCard
+							actions={<Badge variant="secondary">Main</Badge>}
+							name={lead.name}
+						>
+							<InlineTextCell
+								label="Name"
+								onSave={(next) => {
+									if (next) onUpdate({ name: next });
+								}}
+								placeholder="Add a name"
+								saving={saving}
+								value={lead.name}
+							/>
+							{(LEAD_BOARD.designationKinds as readonly string[]).includes(
+								lead.kind,
+							) ? (
+								<InlineTextCell
+									label="Designation / role"
+									onSave={(next) => onUpdate({ designation: next })}
+									placeholder="Add a designation"
+									saving={saving}
+									value={lead.designation}
+								/>
+							) : null}
+							<InlineTextCell
+								label="Mobile number"
+								onSave={(next) => onUpdate({ phone: next })}
+								placeholder="Add a phone number"
+								saving={saving}
+								value={lead.phone}
+							/>
+							<InlineTextCell
+								label="Secondary phone"
+								onSave={(next) => onUpdate({ secondaryPhone: next })}
+								placeholder="Add a phone number"
+								saving={saving}
+								value={lead.secondaryPhone}
+							/>
+							<InlineTextCell
+								label="Email"
+								onSave={(next) => onUpdate({ email: next })}
+								placeholder="Add an email"
+								saving={saving}
+								value={lead.email}
+							/>
+							<InlineTextCell
+								label="Secondary email"
+								onSave={(next) => onUpdate({ secondaryEmail: next })}
+								placeholder="Add an email"
+								saving={saving}
+								value={lead.secondaryEmail}
+							/>
+						</PersonCard>
+					}
+				/>
 			</DetailSheetSection>
 
 			<DetailSheetSection className="py-5" title="Address">
