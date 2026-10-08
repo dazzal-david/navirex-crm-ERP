@@ -329,3 +329,18 @@ describe("converting a lead with several contacts", () => {
 		]);
 	});
 });
+
+describe("lead cards", () => {
+	it("carry every extra person's name for the board and list", async () => {
+		const lead = await epc("Card Co", "Athul", uniquePhone(13));
+		await contacts.add({ leadId: lead.id, name: "Silpa" }, userId);
+		await contacts.add({ leadId: lead.id, name: "Soniya" }, userId);
+
+		const list = await leads.list({ q: `Card Co ${suffix}` }, userId);
+
+		expect(list.leads[0]?.contacts.map((person) => person.name)).toEqual([
+			"Silpa",
+			"Soniya",
+		]);
+	});
+});

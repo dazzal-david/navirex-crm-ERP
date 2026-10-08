@@ -17,6 +17,7 @@ import { useDeferredValue } from "react";
 import { useOpenRecord } from "@/components/crm/record-sheet/record-stack";
 import { LocalRelativeTime } from "@/components/local-date-time";
 import { LEAD_BOARD } from "@/lib/leads/board-config";
+import { leadTitle } from "@/lib/leads/lead-title";
 import { useTRPC } from "@/lib/trpc/client";
 import { useLeadFilters } from "./lead-filters";
 
@@ -101,11 +102,15 @@ export function LeadList() {
 						>
 							<TableCell className="px-5 py-3.5">
 								<div className="flex min-w-0 items-center gap-3">
-									<PersonAvatar name={lead.name} size="sm" />
+									<PersonAvatar name={leadTitle(lead).title} size="sm" />
 									<div className="min-w-0">
-										<p className="truncate font-medium text-sm">{lead.name}</p>
+										<p className="truncate font-medium text-sm">
+											{leadTitle(lead).title}
+										</p>
 										<p className="truncate text-muted-foreground text-xs">
-											{lead.source ?? LEAD_BOARD.kind[lead.kind]}
+											{leadTitle(lead).title === lead.name
+												? (lead.source ?? LEAD_BOARD.kind[lead.kind])
+												: leadTitle(lead).subtitle}
 										</p>
 									</div>
 								</div>

@@ -55,6 +55,10 @@ const cardSelect = {
 	owner: {
 		select: { id: true, name: true, image: true, designation: true },
 	},
+	contacts: {
+		select: { name: true },
+		orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+	},
 } satisfies Prisma.LeadSelect;
 
 const COMPANY_FILL_SELECT = {

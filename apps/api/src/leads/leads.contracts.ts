@@ -48,6 +48,7 @@ export const leadCard = z.object({
 		.nullable(),
 	lastActivityAt: z.date().nullable(),
 	createdAt: z.date(),
+	contacts: z.array(z.object({ name: z.string() })),
 });
 
 export const boardInput = z.object({
