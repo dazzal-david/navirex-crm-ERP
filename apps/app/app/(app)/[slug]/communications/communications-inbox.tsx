@@ -286,7 +286,7 @@ export function CommunicationsInbox() {
 							</Button>
 						</header>
 						<MessageScrollerProvider autoScroll defaultScrollPosition="end">
-							<MessageScroller className="flex-1">
+							<MessageScroller className="min-h-32 flex-1">
 								<MessageScrollerViewport>
 									<MessageScrollerContent className="p-4">
 										{conversation.data?.items.length ? (
@@ -308,138 +308,141 @@ export function CommunicationsInbox() {
 								<MessageScrollerButton />
 							</MessageScroller>
 						</MessageScrollerProvider>
-						<div className="border-t p-3">
-							<div className="mb-2 flex flex-wrap gap-2">
-								{(["note", "email", "whatsapp"] as const).map((value) => (
-									<Button
-										key={value}
-										size="sm"
-										variant={channel === value ? "default" : "outline"}
-										onClick={() => {
-											setChannel(value);
-											setSelectedTemplateId(null);
-											setTemplateValue(EMPTY_TEMPLATE_VALUE);
+						<div className="flex min-h-0 shrink flex-col border-t">
+							<div className="min-h-0 overflow-y-auto p-3">
+								<div className="mb-2 flex flex-wrap gap-2">
+									{(["note", "email", "whatsapp"] as const).map((value) => (
+										<Button
+											key={value}
+											size="sm"
+											variant={channel === value ? "default" : "outline"}
+											onClick={() => {
+												setChannel(value);
+												setSelectedTemplateId(null);
+												setTemplateValue(EMPTY_TEMPLATE_VALUE);
+											}}
+										>
+											<Icon
+												icon={
+													value === "email"
+														? Email
+														: value === "whatsapp"
+															? Chat
+															: Notes
+												}
+												data-icon="inline-start"
+											/>
+											{channelLabel(value)}
+										</Button>
+									))}
+									<Select
+										onValueChange={(id) => {
+											const template = templates.data?.find(
+												(item) => item.id === id,
+											);
+											if (!template) return;
+											setSelectedTemplateId(template.id);
+											setTemplateValue(templateDefaults(template.components));
+											setChannel(template.channel.toLowerCase() as Channel);
+											setSubject(
+												template.subject ?? "Following up from Navirex",
+											);
+											setBody(template.body);
 										}}
 									>
-										<Icon
-											icon={
-												value === "email"
-													? Email
-													: value === "whatsapp"
-														? Chat
-														: Notes
+										<SelectTrigger className="ml-auto w-40">
+											<SelectValue placeholder="Use template" />
+										</SelectTrigger>
+										<SelectContent>
+											{templates.data
+												?.filter((item) => item.active)
+												.map((item) => (
+													<SelectItem key={item.id} value={item.id}>
+														{item.name}
+													</SelectItem>
+												))}
+										</SelectContent>
+									</Select>
+								</div>
+								{channel !== "note" && recipients.length > 1 && activeId ? (
+									<div className="mb-2">
+										<RecipientSelect
+											channel={recipientChannel}
+											onChange={(key) =>
+												setTo({
+													leadId: activeId,
+													channel: recipientChannel,
+													key,
+												})
 											}
-											data-icon="inline-start"
+											recipients={recipients}
+											value={toKey}
 										/>
-										{channelLabel(value)}
-									</Button>
-								))}
-								<Select
-									onValueChange={(id) => {
-										const template = templates.data?.find(
-											(item) => item.id === id,
-										);
-										if (!template) return;
-										setSelectedTemplateId(template.id);
-										setTemplateValue(templateDefaults(template.components));
-										setChannel(template.channel.toLowerCase() as Channel);
-										setSubject(template.subject ?? "Following up from Navirex");
-										setBody(template.body);
-									}}
-								>
-									<SelectTrigger className="ml-auto w-40">
-										<SelectValue placeholder="Use template" />
-									</SelectTrigger>
-									<SelectContent>
-										{templates.data
-											?.filter((item) => item.active)
-											.map((item) => (
-												<SelectItem key={item.id} value={item.id}>
-													{item.name}
-												</SelectItem>
-											))}
-									</SelectContent>
-								</Select>
+									</div>
+								) : null}
+								{channel === "whatsapp" && whatsappWindow ? (
+									<div className="mb-2">
+										<WhatsAppWindowAlert state={whatsappWindow} />
+									</div>
+								) : null}
+								{channel === "email" ? (
+									<Input
+										className="mb-2"
+										value={subject}
+										onChange={(event) => setSubject(event.target.value)}
+										placeholder="Subject"
+									/>
+								) : null}
+								{usingWhatsAppTemplate && selectedTemplate ? (
+									<div className="flex flex-col gap-2">
+										<WhatsAppTemplatePreview template={selectedTemplate} />
+										<WhatsAppTemplateFields
+											components={selectedTemplate.components}
+											onChange={setTemplateValue}
+											value={templateValue}
+										/>
+									</div>
+								) : (
+									<Textarea
+										rows={3}
+										value={body}
+										onChange={(event) => setBody(event.target.value)}
+										disabled={templatesOnly}
+										placeholder={
+											templatesOnly
+												? "Pick an approved template from “Use template” to message this lead."
+												: channel === "note"
+													? "Add an internal note…"
+													: "Write a message…"
+										}
+									/>
+								)}
+								{channel === "whatsapp" && activeId ? (
+									<div className="mt-2">
+										<WhatsAppMediaComposer
+											caption={body}
+											disabled={
+												pending ||
+												!status.data?.whatsapp ||
+												whatsappWindow?.open !== true
+											}
+											contactId={contactId}
+											leadId={activeId}
+											onSent={() => void refresh()}
+										/>
+									</div>
+								) : null}
+								{channel === "email" ? (
+									<div className="mt-2">
+										<EmailAttachmentPicker
+											disabled={pending}
+											files={emailFiles}
+											onChange={setEmailFiles}
+										/>
+									</div>
+								) : null}
 							</div>
-							{channel !== "note" && recipients.length > 1 && activeId ? (
-								<div className="mb-2">
-									<RecipientSelect
-										channel={recipientChannel}
-										onChange={(key) =>
-											setTo({
-												leadId: activeId,
-												channel: recipientChannel,
-												key,
-											})
-										}
-										recipients={recipients}
-										value={toKey}
-									/>
-								</div>
-							) : null}
-							{channel === "whatsapp" && whatsappWindow ? (
-								<div className="mb-2">
-									<WhatsAppWindowAlert state={whatsappWindow} />
-								</div>
-							) : null}
-							{channel === "email" ? (
-								<Input
-									className="mb-2"
-									value={subject}
-									onChange={(event) => setSubject(event.target.value)}
-									placeholder="Subject"
-								/>
-							) : null}
-							{usingWhatsAppTemplate && selectedTemplate ? (
-								<div className="flex flex-col gap-2">
-									<WhatsAppTemplatePreview template={selectedTemplate} />
-									<WhatsAppTemplateFields
-										components={selectedTemplate.components}
-										onChange={setTemplateValue}
-										value={templateValue}
-									/>
-								</div>
-							) : (
-								<Textarea
-									rows={3}
-									value={body}
-									onChange={(event) => setBody(event.target.value)}
-									disabled={templatesOnly}
-									placeholder={
-										templatesOnly
-											? "Pick an approved template from “Use template” to message this lead."
-											: channel === "note"
-												? "Add an internal note…"
-												: "Write a message…"
-									}
-								/>
-							)}
-							{channel === "whatsapp" && activeId ? (
-								<div className="mt-2">
-									<WhatsAppMediaComposer
-										caption={body}
-										disabled={
-											pending ||
-											!status.data?.whatsapp ||
-											whatsappWindow?.open !== true
-										}
-										contactId={contactId}
-										leadId={activeId}
-										onSent={() => void refresh()}
-									/>
-								</div>
-							) : null}
-							{channel === "email" ? (
-								<div className="mt-2">
-									<EmailAttachmentPicker
-										disabled={pending}
-										files={emailFiles}
-										onChange={setEmailFiles}
-									/>
-								</div>
-							) : null}
-
-							<div className="mt-2 flex items-center justify-between gap-3">
+							<div className="flex shrink-0 items-center justify-between gap-3 border-t px-3 py-2">
 								<p className="text-muted-foreground text-xs">
 									{composerHint({
 										channel,
