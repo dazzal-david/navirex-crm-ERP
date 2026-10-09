@@ -31,6 +31,7 @@ import { MailboxModule } from "./mailbox/mailbox.module";
 import { McpModule } from "./mcp/mcp.module";
 import { MetaModule } from "./meta/meta.module";
 import { MicrosoftModule } from "./microsoft/microsoft.module";
+import { NotificationsModule } from "./notifications/notifications.module";
 import { PeopleModule } from "./people/people.module";
 import { SavedViewsModule } from "./saved-views/saved-views.module";
 import { SearchModule } from "./search/search.module";
@@ -67,6 +68,7 @@ import { WorkspaceModule } from "./workspace/workspace.module";
 		CompaniesModule,
 		CommunicationsModule,
 		McpModule,
+		NotificationsModule,
 		ContactsModule,
 		ConversationsModule,
 		CurrencyModule,

@@ -4,10 +4,13 @@ import Add from "@carbon/icons-react/es/Add";
 import { Button } from "@crm/ui/components/button";
 import { Icon } from "@crm/ui/components/icon";
 import { Spinner } from "@crm/ui/components/spinner";
-import { Textarea } from "@crm/ui/components/textarea";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { toast } from "sonner";
+import {
+	MentionText,
+	MentionTextarea,
+} from "@/components/crm/mention-textarea";
 import { LocalDateTime } from "@/components/local-date-time";
 import { useCrmCache } from "@/lib/trpc/cache";
 import { useTRPC } from "@/lib/trpc/client";
@@ -23,15 +26,22 @@ export function LeadNotes({ leadId }: { leadId: string }) {
 	const cache = useCrmCache();
 	const [adding, setAdding] = useState(false);
 	const [draft, setDraft] = useState("");
+	const [mentions, setMentions] = useState<string[]>([]);
 
 	const notes = useQuery(trpc.communications.notes.queryOptions({ leadId }));
 
 	const add = useMutation(
 		trpc.communications.addNote.mutationOptions({
 			onSuccess: async () => {
+				const notified = mentions.length;
 				setDraft("");
+				setMentions([]);
 				setAdding(false);
-				toast.success("Note added.");
+				toast.success(
+					notified > 0
+						? `Note added. ${notified} ${notified === 1 ? "person" : "people"} notified.`
+						: "Note added.",
+				);
 				await Promise.all([
 					queryClient.invalidateQueries({
 						queryKey: trpc.communications.notes.queryKey({ leadId }),
@@ -55,7 +65,7 @@ export function LeadNotes({ leadId }: { leadId: string }) {
 	const text = draft.trim();
 	const submit = () => {
 		if (text === "" || add.isPending) return;
-		add.mutate({ leadId, body: text });
+		add.mutate({ leadId, body: text, mentions });
 	};
 
 	return (
@@ -68,23 +78,21 @@ export function LeadNotes({ leadId }: { leadId: string }) {
 						submit();
 					}}
 				>
-					<Textarea
-						aria-label="New note"
+					<MentionTextarea
+						ariaLabel="New note"
 						autoFocus
-						onChange={(event) => setDraft(event.target.value)}
-						onKeyDown={(event) => {
-							if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
-								event.preventDefault();
-								submit();
-							}
-						}}
-						placeholder="What happened? What did they say? What was promised?"
+						mentions={mentions}
+						onChange={setDraft}
+						onMentionsChange={setMentions}
+						onSubmitShortcut={submit}
+						placeholder="What happened? Type @ to mention a teammate."
 						value={draft}
 					/>
 					<div className="flex justify-end gap-2">
 						<Button
 							onClick={() => {
 								setDraft("");
+								setMentions([]);
 								setAdding(false);
 							}}
 							size="sm"
@@ -122,7 +130,7 @@ export function LeadNotes({ leadId }: { leadId: string }) {
 					{notes.data.map((note) => (
 						<li className="rounded-lg border bg-card p-3" key={note.id}>
 							<p className="whitespace-pre-wrap text-pretty text-sm wrap-anywhere">
-								{note.body}
+								<MentionText mentions={note.mentions} text={note.body} />
 							</p>
 							<p className="mt-2 text-muted-foreground text-xs">
 								{note.authorName} ·{" "}

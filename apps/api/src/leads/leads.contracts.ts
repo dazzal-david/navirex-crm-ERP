@@ -248,6 +248,12 @@ export const leadDetailOutput = leadCard.extend({
 
 export const leadMutateOutput = leadCard;
 
+export const leadConvertInput = z.object({
+	id: z.string(),
+	note: z.string().trim().max(20_000).optional(),
+	mentions: z.array(z.string()).max(20).default([]),
+});
+
 export const leadConvertOutput = z.object({
 	leadId: z.string(),
 	companyId: z.string(),

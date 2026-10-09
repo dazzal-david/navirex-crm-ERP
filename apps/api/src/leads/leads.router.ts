@@ -8,6 +8,7 @@ import {
 	UseMiddlewares,
 } from "nestjs-trpc";
 import type { z } from "zod";
+import { NotificationsService } from "../notifications/notifications.service";
 import type { AuthedTrpcContext } from "../trpc/context.types";
 import { AuthMiddleware } from "../trpc/middlewares/auth.middleware";
 import { restMeta } from "../trpc/openapi";
@@ -25,6 +26,7 @@ import {
 	leadContactIdInput,
 	leadContactsOutput,
 	leadContactUpdateInput,
+	leadConvertInput,
 	leadConvertOutput,
 	leadCreateInput,
 	leadDeleteOutput,
@@ -56,6 +58,8 @@ export class LeadsRouter {
 		@Inject(LeadsService) private readonly leads: LeadsService,
 		@Inject(LeadContactsService)
 		private readonly contacts: LeadContactsService,
+		@Inject(NotificationsService)
+		private readonly notifications: NotificationsService,
 	) {}
 
 	@Query({ input: leadIdInput, output: leadContactsOutput })
@@ -252,12 +256,34 @@ export class LeadsRouter {
 	}
 
 	@Mutation({
-		input: leadIdInput,
+		input: leadConvertInput,
 		output: leadConvertOutput,
 		meta: restMeta("POST", "/leads/{id}/convert", ["Leads"]),
 	})
-	async convert(@Input("id") id: string, @Ctx() ctx: AuthedTrpcContext) {
-		return this.leads.convert(id, ctx.user.id);
+	async convert(
+		@Input() input: z.infer<typeof leadConvertInput>,
+		@Ctx() ctx: AuthedTrpcContext,
+	) {
+		const result = await this.leads.convert(input.id, ctx.user.id);
+		const text = input.note?.trim();
+		if (text) {
+			const note = await this.leads.noteOnConversion(
+				input.id,
+				result.companyId,
+				text,
+				input.mentions,
+				ctx.user.id,
+			);
+			await this.notifications.notifyMentions({
+				actorId: ctx.user.id,
+				mentionIds: input.mentions,
+				leadId: input.id,
+				companyId: result.companyId,
+				activityId: note.id,
+				text,
+			});
+		}
+		return result;
 	}
 
 	@Mutation({

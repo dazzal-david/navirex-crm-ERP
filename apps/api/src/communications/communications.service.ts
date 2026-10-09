@@ -44,6 +44,7 @@ const communicationMetaValue = z.object({
 	direction: z.string().optional(),
 	from: z.string().optional(),
 	toName: z.string().nullable().optional(),
+	mentions: z.array(z.string()).optional(),
 	fromName: z.string().nullable().optional(),
 	mediaId: z.string().optional(),
 	mediaKind: z
@@ -181,14 +182,31 @@ export class CommunicationsService {
 				createdBy: { select: { name: true } },
 			},
 		});
-		return notes
-			.filter((note) => communicationMeta(note.meta).channel !== "whatsapp")
-			.map((note) => ({
-				id: note.id,
-				body: note.body ?? note.subject ?? "",
-				authorName: note.createdBy.name,
-				occurredAt: note.occurredAt ?? note.createdAt,
-			}));
+		const kept = notes.filter(
+			(note) => communicationMeta(note.meta).channel !== "whatsapp",
+		);
+		const mentionedIds = [
+			...new Set(
+				kept.flatMap((note) => communicationMeta(note.meta).mentions ?? []),
+			),
+		];
+		const people = mentionedIds.length
+			? await this.db.user.findMany({
+					where: { id: { in: mentionedIds } },
+					select: { id: true, name: true },
+				})
+			: [];
+		const nameOf = new Map(people.map((person) => [person.id, person.name]));
+		return kept.map((note) => ({
+			id: note.id,
+			body: note.body ?? note.subject ?? "",
+			authorName: note.createdBy.name,
+			occurredAt: note.occurredAt ?? note.createdAt,
+			mentions: (communicationMeta(note.meta).mentions ?? []).flatMap((id) => {
+				const name = nameOf.get(id);
+				return name ? [{ id, name }] : [];
+			}),
+		}));
 	}
 
 	private async unreadByLead(userId: string) {
@@ -441,7 +459,10 @@ export class CommunicationsService {
 		};
 	}
 
-	async addNote(input: { leadId: string; body: string }, userId: string) {
+	async addNote(
+		input: { leadId: string; body: string; mentions?: string[] },
+		userId: string,
+	) {
 		const lead = await this.db.lead.findUnique({
 			where: { id: input.leadId },
 			select: { id: true },
@@ -455,7 +476,11 @@ export class CommunicationsService {
 				leadId: lead.id,
 				createdById: userId,
 				occurredAt: new Date(),
-				meta: { channel: "note", direction: "internal" },
+				meta: {
+					channel: "note",
+					direction: "internal",
+					mentions: [...new Set(input.mentions ?? [])],
+				},
 			},
 			select: { id: true },
 		});

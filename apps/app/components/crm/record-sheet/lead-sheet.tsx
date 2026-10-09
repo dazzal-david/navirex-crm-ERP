@@ -30,6 +30,7 @@ import { leadTitle } from "@/lib/leads/lead-title";
 import { useCrmCache } from "@/lib/trpc/cache";
 import { useTRPC } from "@/lib/trpc/client";
 import type { RouterOutputs } from "@/lib/trpc/types";
+import { ConvertLeadDialog } from "./convert-lead-dialog";
 import { LeadCommunicationActions } from "./lead-communications";
 import { LeadContacts, PersonCard } from "./lead-contacts";
 import { MergeLeadButton, SameCompanyNotice } from "./lead-merge";
@@ -215,28 +216,26 @@ export function LeadSheet({ leadId }: { leadId: string }) {
 								Open account
 							</Button>
 						) : (
-							<Button
-								disabled={convert.isPending}
-								onClick={() =>
+							<ConvertLeadDialog
+								onConvert={(input, done) =>
 									convert.mutate(
-										{ id: lead.id },
+										{ id: lead.id, ...input },
 										{
 											onSuccess: (result) => {
-												toast.success("Converted to an account.");
+												done();
+												toast.success(
+													input.mentions.length > 0
+														? `Converted. ${input.mentions.length} ${input.mentions.length === 1 ? "person" : "people"} notified.`
+														: "Converted to an account.",
+												);
 												openRecord({ kind: "company", id: result.companyId });
 											},
 										},
 									)
 								}
-								size="sm"
-							>
-								{convert.isPending ? (
-									<Spinner data-icon="inline-start" />
-								) : (
-									<Icon data-icon="inline-start" icon={Enterprise} />
-								)}
-								Convert
-							</Button>
+								pending={convert.isPending}
+								title={leadTitle(lead).title}
+							/>
 						)}
 						<Button
 							disabled={archive.isPending}

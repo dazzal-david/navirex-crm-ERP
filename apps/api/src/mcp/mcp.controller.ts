@@ -20,6 +20,7 @@ import { DashboardService } from "../dashboard/dashboard.service";
 import { InjectDatabase } from "../database/database.constants";
 import { LeadContactsService } from "../leads/lead-contacts.service";
 import { LeadsService } from "../leads/leads.service";
+import { NotificationsService } from "../notifications/notifications.service";
 import { TemplatesService } from "../templates/templates.service";
 import { buildMcpServer } from "./mcp-tools";
 
@@ -52,6 +53,7 @@ export class McpController {
 		private readonly communications: CommunicationsService,
 		private readonly dashboard: DashboardService,
 		private readonly templates: TemplatesService,
+		private readonly notifications: NotificationsService,
 	) {}
 
 	@Post()
@@ -81,6 +83,7 @@ export class McpController {
 			communications: this.communications,
 			dashboard: this.dashboard,
 			templates: this.templates,
+			notifications: this.notifications,
 		});
 		const transport = new StreamableHTTPServerTransport({
 			sessionIdGenerator: undefined,

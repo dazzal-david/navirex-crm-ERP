@@ -128,6 +128,7 @@ export const conversationOutput = z.object({
 export const addNoteInput = z.object({
 	leadId: z.string(),
 	body: z.string().trim().min(1).max(50_000),
+	mentions: z.array(z.string()).max(20).default([]),
 });
 
 export const addNoteOutput = z.object({ id: z.string() });
@@ -137,6 +138,7 @@ export const leadNote = z.object({
 	body: z.string(),
 	authorName: z.string(),
 	occurredAt: z.date(),
+	mentions: z.array(z.object({ id: z.string(), name: z.string() })),
 });
 
 export const leadNotesOutput = z.array(leadNote);

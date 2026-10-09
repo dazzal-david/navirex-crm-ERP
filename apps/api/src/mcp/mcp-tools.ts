@@ -14,6 +14,7 @@ import {
 	NAVIREX_ENTITIES,
 } from "../leads/leads.contracts";
 import type { LeadsService } from "../leads/leads.service";
+import type { NotificationsService } from "../notifications/notifications.service";
 import type { TemplatesService } from "../templates/templates.service";
 import { MCP_INSTRUCTIONS, MCP_SERVER } from "./mcp-config";
 
@@ -23,6 +24,7 @@ export type McpServices = {
 	communications: CommunicationsService;
 	dashboard: DashboardService;
 	templates: TemplatesService;
+	notifications: NotificationsService;
 };
 
 type Json =
@@ -63,7 +65,14 @@ export function buildMcpServer(
 	userId: string,
 	services: McpServices,
 ): McpServer {
-	const { leads, contacts, communications, dashboard, templates } = services;
+	const {
+		leads,
+		contacts,
+		communications,
+		dashboard,
+		templates,
+		notifications,
+	} = services;
 	const server = new McpServer(
 		{ name: MCP_SERVER.name, version: MCP_SERVER.version },
 		{ instructions: MCP_INSTRUCTIONS },
@@ -294,21 +303,63 @@ export function buildMcpServer(
 		{
 			title: "Add a note",
 			description:
-				"Add an internal note to a lead. Use it for call outcomes, meeting notes and research summaries. Leads never see notes.",
+				'Add an internal note to a lead: call outcomes, meeting notes, research summaries, updates. To mention teammates ("mention Hari about this"), get their ids from list_team, pass them in mention_ids and write @Name in the text. Each mentioned person gets a CRM notification and an email.',
 			inputSchema: {
 				lead_id: z.string(),
 				text: z.string().trim().min(1).max(20_000),
+				mention_ids: z
+					.array(z.string())
+					.max(20)
+					.default([])
+					.describe("Team member ids from list_team."),
 			},
 			annotations: { readOnlyHint: false, destructiveHint: false },
 		},
-		({ lead_id, text }) =>
+		({ lead_id, text, mention_ids }) =>
 			run(async () => {
 				const note = await communications.addNote(
-					{ leadId: lead_id, body: text },
+					{ leadId: lead_id, body: text, mentions: mention_ids },
 					userId,
 				);
-				return { saved: true, noteId: note.id };
+				const notified = await notifications.notifyMentions({
+					actorId: userId,
+					mentionIds: mention_ids,
+					leadId: lead_id,
+					activityId: note.id,
+					text,
+				});
+				return { saved: true, noteId: note.id, notified };
 			}),
+	);
+
+	server.registerTool(
+		"email_team_member",
+		{
+			title: "Email a teammate",
+			description:
+				'Email a Navirex team member (id from list_team) from the shared mailbox, e.g. "email Parvathy about this update". Pass lead_id when it is about a lead: the email links to it and a note is logged on the lead. The teammate also sees it in their CRM notifications. Confirm the text with the user first.',
+			inputSchema: {
+				user_id: z.string(),
+				subject: z.string().trim().min(1).max(300),
+				body: z.string().trim().min(1).max(20_000),
+				lead_id: z.string().optional(),
+			},
+			annotations: {
+				readOnlyHint: false,
+				destructiveHint: true,
+				openWorldHint: true,
+			},
+		},
+		(input) =>
+			run(async () =>
+				notifications.messageMember({
+					actorId: userId,
+					userId: input.user_id,
+					subject: input.subject,
+					body: input.body,
+					leadId: input.lead_id,
+				}),
+			),
 	);
 
 	server.registerTool(

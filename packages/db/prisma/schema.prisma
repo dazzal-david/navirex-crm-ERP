@@ -29,6 +29,8 @@ model User {
   ownedDeals             Deal[]                 @relation("DealOwner")
   ownedLeads             Lead[]                 @relation("LeadOwner")
   leadReads              LeadConversationRead[]
+  notifications          Notification[]         @relation("NotificationRecipient")
+  notificationsSent      Notification[]         @relation("NotificationActor")
   activities             Activity[]             @relation("ActivityAuthor")
   mailboxSyncs           MailboxSync[]
   factDecisions          ContactFact[]          @relation("FactDecider")
@@ -357,6 +359,8 @@ model Company {
   fieldValues    FieldValue[]
   createdAt      DateTime            @default(now())
   updatedAt      DateTime            @updatedAt
+
+  notifications Notification[]
 
   @@unique([domain], map: "company_domain_active_key", where: { archivedAt: null })
   @@index([ownerId])
@@ -1062,6 +1066,7 @@ model Lead {
   formSubmissions FormSubmission[]
   reads           LeadConversationRead[]
   contacts        LeadContact[]
+  notifications   Notification[]
   createdAt       DateTime               @default(now())
   updatedAt       DateTime               @updatedAt
 
@@ -1421,6 +1426,8 @@ model Activity {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  notifications Notification[]
 
   @@index([companyId, createdAt])
   @@index([dealId, createdAt])
@@ -1938,4 +1945,32 @@ model OauthConsent {
   @@index([clientId])
   @@index([userId])
   @@map("oauthConsent")
+}
+
+enum NotificationKind {
+  MENTION
+  MESSAGE
+}
+
+model Notification {
+  id         String           @id @default(cuid())
+  kind       NotificationKind
+  userId     String
+  user       User             @relation("NotificationRecipient", fields: [userId], references: [id], onDelete: Cascade)
+  actorId    String?
+  actor      User?            @relation("NotificationActor", fields: [actorId], references: [id], onDelete: SetNull)
+  leadId     String?
+  lead       Lead?            @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  companyId  String?
+  company    Company?         @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  activityId String?
+  activity   Activity?        @relation(fields: [activityId], references: [id], onDelete: Cascade)
+  title      String
+  body       String
+  readAt     DateTime?
+  createdAt  DateTime         @default(now())
+
+  @@index([userId, readAt])
+  @@index([userId, createdAt])
+  @@map("notification")
 }

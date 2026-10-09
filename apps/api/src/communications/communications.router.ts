@@ -8,6 +8,7 @@ import {
 	UseMiddlewares,
 } from "nestjs-trpc";
 import type { z } from "zod";
+import { NotificationsService } from "../notifications/notifications.service";
 import type { AuthedTrpcContext } from "../trpc/context.types";
 import { AuthMiddleware } from "../trpc/middlewares/auth.middleware";
 import { restMeta } from "../trpc/openapi";
@@ -36,6 +37,8 @@ export class CommunicationsRouter {
 	constructor(
 		@Inject(CommunicationsService)
 		private readonly communications: CommunicationsService,
+		@Inject(NotificationsService)
+		private readonly notifications: NotificationsService,
 	) {}
 
 	@Query({
@@ -85,11 +88,19 @@ export class CommunicationsRouter {
 	}
 
 	@Mutation({ input: addNoteInput, output: addNoteOutput })
-	addNote(
+	async addNote(
 		@Input() input: z.infer<typeof addNoteInput>,
 		@Ctx() ctx: AuthedTrpcContext,
 	) {
-		return this.communications.addNote(input, ctx.user.id);
+		const note = await this.communications.addNote(input, ctx.user.id);
+		await this.notifications.notifyMentions({
+			actorId: ctx.user.id,
+			mentionIds: input.mentions,
+			leadId: input.leadId,
+			activityId: note.id,
+			text: input.body,
+		});
+		return note;
 	}
 
 	@Mutation({

@@ -28,8 +28,9 @@ import { fieldListInput, fieldListOutput, fieldByKeyInput, serializedFieldOutput
 import { googleConnectionStatusOutput, setAutoCreateInput, suppressDomainInput, suppressDomainOutput, threadInput, emailThreadOutput, calendarEventInput, calendarEventOutput } from "../google/google.contracts";
 import { purgeSyncedDataOutput, revokeAccessOutput, microsoftConnectionStatusOutput, setOutlookAutoCreateInput } from "../microsoft/microsoft.contracts";
 import { invitationsOutput, inviteInput, inviteOutput, invitationIdInput, invitationOutput, removeMemberInput, removeMemberOutput } from "../invitations/invitations.contracts";
-import { leadIdInput, leadContactsOutput, leadContactCreateInput, leadContact, leadContactUpdateInput, leadContactIdInput, leadIdOnlyOutput, sameCompanyOutput, leadMergeInput, boardInput, boardOutput, columnPageInput, columnPageOutput, leadListInput, leadListOutput, leadDetailOutput, leadOwnersOutput, leadEpcOptionsOutput, unassignedLeadsInput, unassignedLeadsOutput, leadAssignManyInput, leadAssignManyOutput, leadCreateInput, leadMutateOutput, leadIntakeInput, leadIntakeOutput, zohoImportInput, zohoImportOutput, leadUpdateInput, leadMoveInput, leadAssignInput, leadConvertOutput, leadDeleteOutput } from "../leads/leads.contracts";
+import { leadIdInput, leadContactsOutput, leadContactCreateInput, leadContact, leadContactUpdateInput, leadContactIdInput, leadIdOnlyOutput, sameCompanyOutput, leadMergeInput, boardInput, boardOutput, columnPageInput, columnPageOutput, leadListInput, leadListOutput, leadDetailOutput, leadOwnersOutput, leadEpcOptionsOutput, unassignedLeadsInput, unassignedLeadsOutput, leadAssignManyInput, leadAssignManyOutput, leadCreateInput, leadMutateOutput, leadIntakeInput, leadIntakeOutput, zohoImportInput, zohoImportOutput, leadUpdateInput, leadMoveInput, leadAssignInput, leadConvertInput, leadConvertOutput, leadDeleteOutput } from "../leads/leads.contracts";
 import { metaStatusOutput, metaAvailablePagesOutput, metaPageInput, metaMutationOutput, metaSyncOutput } from "../meta/meta.contracts";
+import { notificationsOutput, unreadNotificationsOutput, notificationIdInput, markedOutput } from "../notifications/notifications.contracts";
 import { employeePortalOutput, directoryOutput, updateMyProfileInput, employeeProfileOutput, updateEmployeeInput, reimbursementsOutput, submitReimbursementInput, reimbursementOutput, reviewReimbursementInput, reimbursementIdInput } from "../people/people.contracts";
 import { savedViewListInput, savedViewListOutput, savedViewCreateInput, savedViewOutput, savedViewUpdateArgs, savedViewIdInput, savedViewDeleteOutput } from "../saved-views/saved-views.contracts";
 import { agentModelOutput, modelCatalogOutput, setAgentModelInput, researchKeyOutput, setResearchKeyInput, archiveRetentionOutput, setArchiveRetentionDaysInput, reimbursementNotificationsOutput, setReimbursementNotificationsInput } from "../settings/settings.contracts";
@@ -713,7 +714,7 @@ const appRouter = t.router({
       .output(leadMutateOutput)
       .mutation(async () => "PLACEHOLDER_DO_NOT_REMOVE" as any),
     convert: publicProcedure
-      .input(leadIdInput)
+      .input(leadConvertInput)
       .output(leadConvertOutput)
       .mutation(async () => "PLACEHOLDER_DO_NOT_REMOVE" as any),
     remove: publicProcedure
@@ -756,6 +757,21 @@ const appRouter = t.router({
     setAutoCreate: publicProcedure
       .input(setOutlookAutoCreateInput)
       .output(microsoftConnectionStatusOutput)
+      .mutation(async () => "PLACEHOLDER_DO_NOT_REMOVE" as any)
+    }),
+  notifications: t.router({
+    list: publicProcedure
+      .output(notificationsOutput)
+      .query(async () => "PLACEHOLDER_DO_NOT_REMOVE" as any),
+    unreadCount: publicProcedure
+      .output(unreadNotificationsOutput)
+      .query(async () => "PLACEHOLDER_DO_NOT_REMOVE" as any),
+    markRead: publicProcedure
+      .input(notificationIdInput)
+      .output(markedOutput)
+      .mutation(async () => "PLACEHOLDER_DO_NOT_REMOVE" as any),
+    markAllRead: publicProcedure
+      .output(markedOutput)
       .mutation(async () => "PLACEHOLDER_DO_NOT_REMOVE" as any)
     }),
   people: t.router({

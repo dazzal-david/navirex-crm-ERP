@@ -39,6 +39,7 @@ import {
 	type EmailAttachmentFile,
 	EmailAttachmentPicker,
 } from "@/components/crm/email/email-attachment-picker";
+import { MentionTextarea } from "@/components/crm/mention-textarea";
 import {
 	contactIdOf,
 	defaultRecipient,
@@ -90,6 +91,7 @@ export function CommunicationsInbox() {
 	const [channel, setChannel] = useState<Channel>("note");
 	const [subject, setSubject] = useState("Following up from Navirex");
 	const [body, setBody] = useState("");
+	const [noteMentions, setNoteMentions] = useState<string[]>([]);
 	const [emailFiles, setEmailFiles] = useState<EmailAttachmentFile[]>([]);
 
 	const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(
@@ -153,6 +155,7 @@ export function CommunicationsInbox() {
 			}),
 		]);
 		setBody("");
+		setNoteMentions([]);
 		setEmailFiles([]);
 
 		setSelectedTemplateId(null);
@@ -402,6 +405,15 @@ export function CommunicationsInbox() {
 											value={templateValue}
 										/>
 									</div>
+								) : channel === "note" ? (
+									<MentionTextarea
+										ariaLabel="Internal note"
+										mentions={noteMentions}
+										onChange={setBody}
+										onMentionsChange={setNoteMentions}
+										placeholder="Add an internal note. Type @ to mention a teammate."
+										value={body}
+									/>
 								) : (
 									<Textarea
 										rows={3}
@@ -411,9 +423,7 @@ export function CommunicationsInbox() {
 										placeholder={
 											templatesOnly
 												? "Pick an approved template from “Use template” to message this lead."
-												: channel === "note"
-													? "Add an internal note…"
-													: "Write a message…"
+												: "Write a message…"
 										}
 									/>
 								)}
@@ -456,7 +466,11 @@ export function CommunicationsInbox() {
 									onClick={() => {
 										if (!activeId) return;
 										if (channel === "note")
-											note.mutate({ leadId: activeId, body });
+											note.mutate({
+												leadId: activeId,
+												body,
+												mentions: noteMentions,
+											});
 										if (channel === "email")
 											email.mutate({
 												leadId: activeId,

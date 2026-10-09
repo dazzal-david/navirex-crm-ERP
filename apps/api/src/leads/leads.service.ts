@@ -857,6 +857,34 @@ export class LeadsService {
 		};
 	}
 
+	async noteOnConversion(
+		leadId: string,
+		companyId: string,
+		text: string,
+		mentions: string[],
+		userId: string,
+	) {
+		const now = new Date();
+		const note = await this.db.activity.create({
+			data: {
+				type: ActivityType.NOTE,
+				subject: LEADS.note.subject,
+				body: text,
+				leadId,
+				companyId,
+				createdById: userId,
+				occurredAt: now,
+				meta: { ...LEADS.note.meta, mentions: [...new Set(mentions)] },
+			},
+			select: { id: true },
+		});
+		await this.db.lead.update({
+			where: { id: leadId },
+			data: { lastActivityAt: now },
+		});
+		return note;
+	}
+
 	async remove(id: string) {
 		await this.db.lead.update({
 			where: { id },
