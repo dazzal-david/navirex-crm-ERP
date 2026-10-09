@@ -5,6 +5,7 @@ import { schemas } from "@crm/validation";
 import { type BetterAuthOptions, betterAuth } from "better-auth";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 import { APIError } from "better-auth/api";
+import { mcp } from "better-auth/plugins";
 import { genericOAuth } from "better-auth/plugins/generic-oauth";
 import { organization } from "better-auth/plugins/organization";
 import { API_KEY_EXPIRATION, API_KEY_HEADER, API_KEY_PREFIX } from "./api-keys";
@@ -16,6 +17,7 @@ import {
 	NotInvitedError,
 	pendingInvitationFor,
 } from "./invitations";
+import { MCP } from "./mcp-config";
 import { ensureWorkspaceMembership } from "./organization";
 import {
 	GOOGLE_PROVIDER_ID,
@@ -293,6 +295,16 @@ export const auth = betterAuth({
 
 		sso({
 			organizationProvisioning: { disabled: true },
+		}),
+
+		mcp({
+			loginPage: `${env.appUrl}/sign-in`,
+			oidcConfig: {
+				loginPage: `${env.appUrl}/sign-in`,
+				accessTokenExpiresIn: MCP.accessTokenSeconds,
+				refreshTokenExpiresIn: MCP.refreshTokenSeconds,
+				requirePKCE: true,
+			},
 		}),
 
 		apiKey({

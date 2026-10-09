@@ -8,6 +8,7 @@
 		"./client": "./src/client.ts",
 		"./cookies": "./src/cookies.ts",
 		"./invite-config": "./src/invite-config.ts",
+		"./mcp-config": "./src/mcp-config.ts",
 		"./scopes": "./src/scopes.ts",
 		"./workspace": "./src/workspace.ts"
 	},

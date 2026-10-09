@@ -11,7 +11,13 @@ export type SsoProvider = {
 	name: string;
 };
 
-export function SsoSignIn({ providers }: { providers: SsoProvider[] }) {
+export function SsoSignIn({
+	providers,
+	next,
+}: {
+	providers: SsoProvider[];
+	next: string | null;
+}) {
 	const [pending, setPending] = useState<string | null>(null);
 
 	async function handleClick(providerId: string) {
@@ -21,7 +27,7 @@ export function SsoSignIn({ providers }: { providers: SsoProvider[] }) {
 
 		const { error } = await signIn.sso({
 			providerId,
-			callbackURL: `${origin}/`,
+			callbackURL: `${origin}${next ?? "/"}`,
 			errorCallbackURL: `${origin}/sign-in`,
 		});
 

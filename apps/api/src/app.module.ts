@@ -28,6 +28,7 @@ import { LeadsModule } from "./leads/leads.module";
 import { LoggingModule } from "./logging/logging.module";
 import { logAuthRoute } from "./logging/request-logger.middleware";
 import { MailboxModule } from "./mailbox/mailbox.module";
+import { McpModule } from "./mcp/mcp.module";
 import { MetaModule } from "./meta/meta.module";
 import { MicrosoftModule } from "./microsoft/microsoft.module";
 import { PeopleModule } from "./people/people.module";
@@ -65,6 +66,7 @@ import { WorkspaceModule } from "./workspace/workspace.module";
 		ApiKeysModule,
 		CompaniesModule,
 		CommunicationsModule,
+		McpModule,
 		ContactsModule,
 		ConversationsModule,
 		CurrencyModule,

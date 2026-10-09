@@ -1,3 +1,4 @@
+import { MCP } from "@crm/auth/mcp-config";
 import { connection } from "next/server";
 import { bufferedProxyResponse } from "@/lib/api-proxy-response";
 import { API_URL } from "@/lib/env";
@@ -23,6 +24,7 @@ async function handler(request: Request): Promise<Response> {
 	]) {
 		headers.delete(header);
 	}
+	headers.set(MCP.appOriginHeader, url.origin);
 
 	const init: RequestInit & { duplex?: "half" } = {
 		method: request.method,

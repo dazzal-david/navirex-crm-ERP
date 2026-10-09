@@ -8,6 +8,6 @@ import { LeadsService } from "./leads.service";
 @Module({
 	imports: [TrpcModule, AgentModule],
 	providers: [LeadsService, LeadContactsService, LeadsRouter],
-	exports: [LeadsService],
+	exports: [LeadsService, LeadContactsService],
 })
 export class LeadsModule {}

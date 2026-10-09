@@ -247,3 +247,24 @@ icon marks are used at these sizes; the wordmarks stay unused.
 
 Docusign is spelled with a lowercase s since its 2024 rebrand. The note-taker is
 **Ergo**.
+
+## Claude connector (MCP)
+
+Each person adds Navirex CRM to their own Claude account as a custom connector:
+Claude → Settings → Connectors → Add custom connector, URL
+`<APP_URL>/api/mcp`. Claude then opens the CRM's consent page and the person
+signs in with their CRM account.
+
+- The MCP server lives in `apps/api/src/mcp`. It is stateless (JSON responses
+  over POST), so it runs on Vercel functions.
+- Sign-in uses the better-auth `mcp` plugin for client registration and tokens,
+  but every URL Claude sees is on the **app** origin: discovery documents in
+  `apps/app/app/.well-known`, the consent page at `/oauth/authorize`, and token
+  and registration calls through the `/api/*` proxy. The session cookie only
+  exists on the app origin, so an authorize step on the API origin cannot see it.
+- The consent page accepts only `claude.ai` and `claude.com` redirect URIs
+  (`MCP.allowedRedirectHosts`). Approval is a POST that must carry the app's own
+  `Origin`.
+- Tools act as the signed-in user with that user's role. A removed member's
+  token stops working at once. Sending tools are marked destructive so Claude
+  asks before each send.

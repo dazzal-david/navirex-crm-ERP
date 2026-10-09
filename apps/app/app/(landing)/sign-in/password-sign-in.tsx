@@ -9,7 +9,7 @@ import { useRouter } from "next/navigation";
 import { useId, useState } from "react";
 import { toast } from "sonner";
 
-export function PasswordSignIn() {
+export function PasswordSignIn({ next }: { next: string | null }) {
 	const router = useRouter();
 
 	const emailId = useId();
@@ -30,6 +30,11 @@ export function PasswordSignIn() {
 
 		if (error) {
 			fail(error.message);
+			return;
+		}
+
+		if (next) {
+			window.location.assign(next);
 			return;
 		}
 

@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { redirect, unstable_rethrow } from "next/navigation";
 import { Suspense } from "react";
 import { AuthHeading, AuthShell } from "@/components/auth-shell";
+import { safeNext } from "@/lib/safe-next";
 import { getSession } from "@/lib/session";
 import { getServerQueryClient, getServerTrpc } from "@/lib/trpc/server";
 import { PasswordSignIn } from "./password-sign-in";
@@ -62,14 +63,16 @@ export default function SignInPage({ searchParams }: PageProps<"/sign-in">) {
 async function SignIn({
 	searchParams,
 }: Pick<PageProps<"/sign-in">, "searchParams">) {
-	const [session, options, { method }] = await Promise.all([
+	const [session, options, { method, next: nextParam }] = await Promise.all([
 		currentSession(),
 		signInOptions(),
 		searchParams,
 	]);
 
+	const next = safeNext(nextParam);
+
 	if (session) {
-		redirect("/");
+		redirect(next ?? "/");
 	}
 
 	const configured: MailboxProviderId[] = [];
@@ -113,7 +116,7 @@ async function SignIn({
 				description="Sign in with your account to continue."
 			/>
 
-			{password ? <PasswordSignIn /> : null}
+			{password ? <PasswordSignIn next={next} /> : null}
 
 			{password && (showSso || social.length > 0) ? (
 				<div className="flex w-full items-center gap-3 text-muted-foreground text-xs uppercase">
@@ -123,9 +126,9 @@ async function SignIn({
 				</div>
 			) : null}
 
-			{showSso ? <SsoSignIn providers={providers} /> : null}
+			{showSso ? <SsoSignIn next={next} providers={providers} /> : null}
 			{social.map((provider) => (
-				<SocialSignIn key={provider} provider={provider} />
+				<SocialSignIn key={provider} next={next} provider={provider} />
 			))}
 		</>
 	);

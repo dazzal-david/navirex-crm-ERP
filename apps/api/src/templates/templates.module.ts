@@ -8,5 +8,6 @@ import { TemplatesService } from "./templates.service";
 	imports: [TrpcModule],
 	controllers: [TemplateSyncController],
 	providers: [TemplatesService, TemplatesRouter],
+	exports: [TemplatesService],
 })
 export class TemplatesModule {}
